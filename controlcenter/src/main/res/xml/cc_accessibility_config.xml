@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Permissões mínimas: o serviço NÃO lê o conteúdo da tela
+    (canRetrieveWindowContent = false). Ele só recebe o aviso de "janela mudou"
+    para fechar o painel do sistema e o próprio painel quando necessário.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/cc_service_description"
+    android:notificationTimeout="100" />

@@ -24,9 +24,11 @@ include(":themes")
 // Parte 2
 include(":launcher")
 
+// Parte 3
+include(":controlcenter")
+
 // Módulos planejados (entram nas próximas partes, um por vez):
 // include(":widgets")
-// include(":controlcenter")
 // include(":notifications")
 // include(":lockscreen")
 // include(":sounds")

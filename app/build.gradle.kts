@@ -12,8 +12,8 @@ android {
         applicationId = "com.pixelexperience.forall"
         minSdk = 31          // Android 12+ (cobre o Android 14 e usa Material You)
         targetSdk = 34       // Android 14
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
     }
 
     buildTypes {
@@ -43,6 +43,7 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":themes"))
     implementation(project(":launcher"))
+    implementation(project(":controlcenter"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

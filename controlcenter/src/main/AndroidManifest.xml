@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Mostrar o tipo de conexão atual (Wi-Fi / dados móveis) no tile Internet. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Brilho e rotação automática. O usuário concede em Configurações (sem adb, sem PC). -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+
+    <application>
+        <service
+            android:name=".ControlCenterService"
+            android:exported="false"
+            android:label="@string/cc_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/cc_accessibility_config" />
+        </service>
+    </application>
+
+</manifest>
