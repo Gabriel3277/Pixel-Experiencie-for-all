@@ -3,6 +3,14 @@
 
     <!-- Nenhuma permissão necessária: sem root, sem acesso especial. -->
 
+    <!-- Permite listar apenas os apps que são launchers (tela inicial). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+    </queries>
+
     <application
         android:name=".PixelApplication"
         android:allowBackup="false"

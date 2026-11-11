@@ -11,11 +11,13 @@ import com.pixelexperience.forall.MainViewModel
 import com.pixelexperience.forall.core.modules.PixelModuleId
 import com.pixelexperience.forall.ui.appearance.AppearanceScreen
 import com.pixelexperience.forall.ui.home.HomeScreen
+import com.pixelexperience.forall.ui.launcher.LauncherScreen
 import com.pixelexperience.forall.ui.module.ModuleDetailScreen
 
 object Routes {
     const val HOME = "home"
     const val APPEARANCE = "appearance"
+    const val LAUNCHER = "launcher"
     const val MODULE = "module/{moduleId}"
     const val ARG_MODULE_ID = "moduleId"
 
@@ -30,7 +32,10 @@ fun PixelNavHost(viewModel: MainViewModel, state: MainUiState) {
         composable(Routes.HOME) {
             HomeScreen(
                 state = state,
-                onOpenModule = { navController.navigate(Routes.module(it)) },
+                onOpenModule = { id ->
+                    val route = if (id == PixelModuleId.LAUNCHER) Routes.LAUNCHER else Routes.module(id)
+                    navController.navigate(route)
+                },
                 onOpenAppearance = { navController.navigate(Routes.APPEARANCE) },
                 onToggleModule = viewModel::setModuleEnabled,
             )
@@ -41,6 +46,13 @@ fun PixelNavHost(viewModel: MainViewModel, state: MainUiState) {
                 onBack = { navController.popBackStack() },
                 onThemeMode = viewModel::setThemeMode,
                 onDynamicColor = viewModel::setDynamicColor,
+            )
+        }
+        composable(Routes.LAUNCHER) {
+            LauncherScreen(
+                moduleEnabled = state.modules
+                    .firstOrNull { it.info.id == PixelModuleId.LAUNCHER }?.enabled ?: true,
+                onBack = { navController.popBackStack() },
             )
         }
         composable(

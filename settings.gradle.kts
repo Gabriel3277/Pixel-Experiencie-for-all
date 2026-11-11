@@ -21,8 +21,10 @@ include(":app")
 include(":core")
 include(":themes")
 
+// Parte 2
+include(":launcher")
+
 // Módulos planejados (entram nas próximas partes, um por vez):
-// include(":launcher")
 // include(":widgets")
 // include(":controlcenter")
 // include(":notifications")

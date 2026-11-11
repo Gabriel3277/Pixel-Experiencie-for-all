@@ -27,4 +27,17 @@
     <string name="appearance_dynamic_desc">Usa as cores do papel de parede (Material You) em vez da paleta Pixel.</string>
     <string name="appearance_palette">Paleta atual</string>
     <string name="appearance_module_off">O módulo Temas está desativado. O app usa o tema do sistema e a paleta Pixel.</string>
+
+    <string name="launcher_title">Launcher</string>
+    <string name="launcher_module_off">O módulo Launcher está desativado. As ações ficam bloqueadas.</string>
+    <string name="launcher_not_found">Nenhum Lawnchair encontrado neste aparelho. Instale o APK do seu fork e volte aqui.</string>
+    <string name="launcher_found">Lawnchair detectado</string>
+    <string name="launcher_is_default">É o launcher padrão</string>
+    <string name="launcher_not_default">Instalado, mas não é o padrão</string>
+    <string name="launcher_open">Abrir</string>
+    <string name="launcher_set_default">Definir como padrão</string>
+    <string name="launcher_installed_title">Launchers instalados</string>
+    <string name="launcher_default_tag">Padrão</string>
+    <string name="launcher_info">O Android não deixa um app trocar o launcher padrão sozinho. O botão abre a tela do sistema onde você escolhe.</string>
+    <string name="launcher_open_failed">Não foi possível abrir.</string>
 </resources>

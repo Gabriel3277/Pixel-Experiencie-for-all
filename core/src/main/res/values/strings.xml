@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="module_launcher_title">Launcher</string>
-    <string name="module_launcher_desc">Tela inicial com o visual do Pixel Launcher.</string>
+    <string name="module_launcher_desc">Detecta, abre e define como padrão o seu launcher Lawnchair (Pixel).</string>
     <string name="module_themes_title">Temas</string>
     <string name="module_themes_desc">Tema claro, escuro e paleta Pixel ou cores do sistema.</string>
     <string name="module_widgets_title">Widgets</string>

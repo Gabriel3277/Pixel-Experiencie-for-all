@@ -8,7 +8,7 @@ import com.pixelexperience.forall.core.R
  */
 object ModuleCatalog {
     val all: List<PixelModuleInfo> = listOf(
-        PixelModuleInfo(PixelModuleId.LAUNCHER, R.string.module_launcher_title, R.string.module_launcher_desc, ModuleStatus.PLANNED),
+        PixelModuleInfo(PixelModuleId.LAUNCHER, R.string.module_launcher_title, R.string.module_launcher_desc, ModuleStatus.AVAILABLE),
         PixelModuleInfo(PixelModuleId.THEMES, R.string.module_themes_title, R.string.module_themes_desc, ModuleStatus.AVAILABLE),
         PixelModuleInfo(PixelModuleId.WIDGETS, R.string.module_widgets_title, R.string.module_widgets_desc, ModuleStatus.PLANNED),
         PixelModuleInfo(PixelModuleId.CONTROL_CENTER, R.string.module_controlcenter_title, R.string.module_controlcenter_desc, ModuleStatus.PLANNED),
