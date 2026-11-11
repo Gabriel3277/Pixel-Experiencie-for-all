@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pixel Experience</string>
+    <string name="back">Voltar</string>
+
+    <string name="home_core_title">Pixel Experience Core</string>
+    <string name="home_core_subtitle">Base da plataforma ativa e pronta para receber módulos.</string>
+    <string name="home_android">Android %1$s (API %2$d)</string>
+    <string name="home_device">%1$s %2$s</string>
+    <string name="home_modules_active">%1$d de %2$d módulos ativos</string>
+    <string name="home_modules_title">Módulos</string>
+
+    <string name="status_available">Disponível</string>
+    <string name="status_planned">Em breve</string>
+
+    <string name="module_not_found">Módulo não encontrado.</string>
+    <string name="module_planned_note">Este módulo ainda não foi desenvolvido. Ele chega em uma próxima parte do projeto.</string>
+    <string name="module_available_note">Módulo ativo. As opções dele ficam em Aparência.</string>
+    <string name="module_open_appearance">Abrir Aparência</string>
+
+    <string name="appearance_title">Aparência</string>
+    <string name="appearance_theme_mode">Tema</string>
+    <string name="appearance_theme_system">Sistema</string>
+    <string name="appearance_theme_light">Claro</string>
+    <string name="appearance_theme_dark">Escuro</string>
+    <string name="appearance_dynamic_title">Cores do sistema</string>
+    <string name="appearance_dynamic_desc">Usa as cores do papel de parede (Material You) em vez da paleta Pixel.</string>
+    <string name="appearance_palette">Paleta atual</string>
+    <string name="appearance_module_off">O módulo Temas está desativado. O app usa o tema do sistema e a paleta Pixel.</string>
+</resources>

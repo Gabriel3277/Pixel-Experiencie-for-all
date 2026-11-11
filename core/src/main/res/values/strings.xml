@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="module_launcher_title">Launcher</string>
+    <string name="module_launcher_desc">Tela inicial com o visual do Pixel Launcher.</string>
+    <string name="module_themes_title">Temas</string>
+    <string name="module_themes_desc">Tema claro, escuro e paleta Pixel ou cores do sistema.</string>
+    <string name="module_widgets_title">Widgets</string>
+    <string name="module_widgets_desc">Widgets no estilo Pixel.</string>
+    <string name="module_controlcenter_title">Central de controle</string>
+    <string name="module_controlcenter_desc">Atalhos rápidos e controles do sistema.</string>
+    <string name="module_notifications_title">Notificações</string>
+    <string name="module_notifications_desc">Aparência e organização das notificações.</string>
+    <string name="module_lockscreen_title">Tela de bloqueio</string>
+    <string name="module_lockscreen_desc">Visual da tela de bloqueio.</string>
+    <string name="module_sounds_title">Sons</string>
+    <string name="module_sounds_desc">Toques e sons de notificação.</string>
+    <string name="module_extras_title">Extras</string>
+    <string name="module_extras_desc">Recursos adicionais.</string>
+</resources>
