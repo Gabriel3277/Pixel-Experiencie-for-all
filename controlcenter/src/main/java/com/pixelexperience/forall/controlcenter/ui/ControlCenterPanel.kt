@@ -240,7 +240,7 @@ private fun BrightnessBar(state: PanelState, actions: PanelActions) {
         if (state.canWriteSettings) {
             Slider(
                 value = state.brightness,
-                onValueChange = state::setBrightness,
+                onValueChange = state::updateBrightness,
                 modifier = Modifier
                     .weight(1f)
                     .padding(start = 8.dp),

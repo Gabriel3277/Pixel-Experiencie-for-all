@@ -118,7 +118,7 @@ internal class PanelState(private val context: Context) {
         brightness = (raw / 255f).coerceIn(0f, 1f)
     }
 
-    fun setBrightness(value: Float) {
+    fun updateBrightness(value: Float) {
         if (!canWriteSettings) return
         brightness = value.coerceIn(0f, 1f)
         val level = (brightness * 255f).roundToInt().coerceIn(1, 255)
