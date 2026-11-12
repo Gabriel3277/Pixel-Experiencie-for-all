@@ -50,7 +50,10 @@ import kotlin.math.roundToInt
  *    segue o dedo na MESMA janela, para o gesto não se perder.
  * 3. Ao soltar, o painel abre ou fecha conforme a posição e a velocidade.
  */
-internal class ShadeWindow(private val service: AccessibilityService) : PanelActions {
+internal class ShadeWindow(
+    private val service: AccessibilityService,
+    private val showVolume: () -> Unit = {},
+) : PanelActions {
 
     private enum class Phase { IDLE, OPENING, OPEN, CLOSING, SETTLING }
 
@@ -499,7 +502,11 @@ internal class ShadeWindow(private val service: AccessibilityService) : PanelAct
 
     override fun openBluetooth() = launch(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
 
-    override fun openVolume() = launch(Intent(Settings.Panel.ACTION_VOLUME))
+    /** Fecha a central e abre o nosso painel de volume (já expandido). */
+    override fun openVolume() {
+        collapse()
+        root?.postDelayed({ showVolume() }, 240L)
+    }
 
     override fun openSettings() = launch(Intent(Settings.ACTION_SETTINGS))
 

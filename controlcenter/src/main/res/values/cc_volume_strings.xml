@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cc_vp_media">Mídia</string>
+    <string name="cc_vp_call">Chamada</string>
+    <string name="cc_vp_ring">Toque</string>
+    <string name="cc_vp_notification">Notificação</string>
+    <string name="cc_vp_alarm">Alarme</string>
+    <string name="cc_vp_plays_on">A mídia vai tocar em</string>
+    <string name="cc_vp_this_phone">Este telefone</string>
+    <string name="cc_vp_headphones">Fones de ouvido</string>
+    <string name="cc_vp_done">Concluído</string>
+    <string name="cc_vp_mode_silent">Mudo</string>
+    <string name="cc_vp_mode_vibrate">Vibrar</string>
+    <string name="cc_vp_mode_ring">Tocar</string>
+    <string name="cc_vp_settings">Configurações de som</string>
+    <string name="cc_vp_captions">Legendas</string>
+</resources>

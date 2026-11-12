@@ -9,6 +9,7 @@ import android.content.SharedPreferences
  */
 object ControlCenterPrefs {
     const val KEY_ENABLED = "module_enabled"
+    const val KEY_VOLUME_PANEL = "volume_panel_enabled"
     private const val FILE = "controlcenter_prefs"
 
     internal fun prefs(context: Context): SharedPreferences =
@@ -19,5 +20,13 @@ object ControlCenterPrefs {
 
     fun setEnabled(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_ENABLED, enabled).apply()
+    }
+
+    /** Painel de volume próprio (intercepta as teclas de volume). */
+    fun isVolumePanelEnabled(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_VOLUME_PANEL, true)
+
+    fun setVolumePanelEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_VOLUME_PANEL, enabled).apply()
     }
 }
