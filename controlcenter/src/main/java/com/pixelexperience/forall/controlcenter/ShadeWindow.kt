@@ -9,10 +9,14 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.PixelFormat
 import android.net.Uri
 import android.os.SystemClock
+import android.provider.AlarmClock
 import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
@@ -32,13 +36,15 @@ import com.pixelexperience.forall.controlcenter.ui.ControlCenterPanel
 import com.pixelexperience.forall.controlcenter.ui.PANEL_CONTENT_DP
 import com.pixelexperience.forall.themes.PixelTheme
 import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
  * Janela do painel.
  *
  * Ideia (estudada no PanOSP, reescrita do zero):
- * 1. Uma janela transparente, do tamanho da barra de status, fica sempre no topo
+ * 1. Uma janela transparente e pequena fica numa faixa do lado direito da tela
  *    (tipo TYPE_ACCESSIBILITY_OVERLAY: não precisa da permissão "sobrepor a outros apps").
  * 2. No primeiro toque ela cresce até a tela toda, fecha o painel do sistema e
  *    segue o dedo na MESMA janela, para o gesto não se perder.
@@ -68,6 +74,9 @@ internal class ShadeWindow(private val service: AccessibilityService) : PanelAct
     private var progress = 0f
     private var statusBarPx = 0
     private var panelHeightPx = 0
+    private var zoneW = 0
+    private var zoneH = 0
+    private var zoneTop = 0
     private var startY = 0f
     private var startX = 0f
     private var moved = false
@@ -87,8 +96,7 @@ internal class ShadeWindow(private val service: AccessibilityService) : PanelAct
     fun start() {
         if (root != null) return
 
-        statusBarPx = readStatusBarHeight()
-        panelHeightPx = statusBarPx + (PANEL_CONTENT_DP * density).roundToInt()
+        computeGeometry()
 
         val view = ShadeRoot(service)
         view.setBackgroundColor(Color.TRANSPARENT)
@@ -101,15 +109,15 @@ internal class ShadeWindow(private val service: AccessibilityService) : PanelAct
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
 
         val lp = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            statusBarPx,
+            zoneW,
+            zoneH,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             flags,
             PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.TOP
+            gravity = Gravity.TOP or Gravity.END
             x = 0
-            y = 0
+            y = zoneTop
             title = "PixelControlCenterShade"
             layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
@@ -156,13 +164,42 @@ internal class ShadeWindow(private val service: AccessibilityService) : PanelAct
         }
     }
 
+    /** A tela girou ou mudou de tamanho: recalcula a faixa e o painel. */
+    fun onConfigurationChanged() {
+        computeGeometry()
+        if (phase == Phase.IDLE) applyGeometry(expanded = false)
+    }
+
     // ------------------------------------------------------------------
     // Toque
     // ------------------------------------------------------------------
 
     private inner class ShadeRoot(context: Context) : FrameLayout(context) {
+        private val handlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(150, 136, 136, 136)
+        }
+        private val handleRect = RectF()
+
+        init {
+            setWillNotDraw(false)
+        }
+
         override fun onInterceptTouchEvent(ev: MotionEvent): Boolean = interceptTouch(ev)
+
         override fun onTouchEvent(ev: MotionEvent): Boolean = handleTouch(ev)
+
+        /** Marquinha cinza que mostra onde deslizar (só quando o painel está fechado). */
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            if (phase != Phase.IDLE) return
+            if (keyguard?.isKeyguardLocked == true) return
+            val w = 4f * density
+            val h = 56f * density
+            val right = width - 10f * density
+            val top = (height - h) / 2f
+            handleRect.set(right - w, top, right, top + h)
+            canvas.drawRoundRect(handleRect, w / 2f, w / 2f, handlePaint)
+        }
     }
 
     private fun interceptTouch(ev: MotionEvent): Boolean {
@@ -203,7 +240,7 @@ internal class ShadeWindow(private val service: AccessibilityService) : PanelAct
         phase = Phase.OPENING
         tracker = VelocityTracker.obtain().also { it.addMovement(ev) }
 
-        resizeWindow(WindowManager.LayoutParams.MATCH_PARENT)
+        applyGeometry(expanded = true)
         dismissSystemShade()
         attachPanel()
         applyProgress(0f)
@@ -216,7 +253,7 @@ internal class ShadeWindow(private val service: AccessibilityService) : PanelAct
             MotionEvent.ACTION_MOVE -> {
                 val dy = ev.rawY - startY
                 if (abs(dy) > touchSlop) moved = true
-                val p = if (opening) dy / panelHeightPx else 1f + dy / panelHeightPx
+                val p = if (opening) dy * DRAG_GAIN / panelHeightPx else 1f + dy * DRAG_GAIN / panelHeightPx
                 applyProgress(p.coerceIn(0f, 1f))
             }
             MotionEvent.ACTION_UP -> {
@@ -348,18 +385,42 @@ internal class ShadeWindow(private val service: AccessibilityService) : PanelAct
         panel = null
         progress = 0f
         phase = Phase.IDLE
-        resizeWindow(statusBarPx)
+        applyGeometry(expanded = false)
+        root?.invalidate()
     }
 
-    private fun resizeWindow(height: Int) {
+    private fun computeGeometry() {
+        val dm = service.resources.displayMetrics
+        val w = dm.widthPixels
+        val h = dm.heightPixels
+        statusBarPx = readStatusBarHeight()
+        panelHeightPx = statusBarPx + (PANEL_CONTENT_DP * density).roundToInt()
+        zoneW = max((min(w, h) * ZONE_WIDTH_FRACTION).roundToInt(), (56 * density).roundToInt())
+        zoneH = (h * ZONE_HEIGHT_FRACTION).roundToInt()
+        zoneTop = (h * ZONE_TOP_FRACTION).roundToInt()
+    }
+
+    /** expanded = tela toda (painel aberto/arrastando); senão, só a faixa do gesto. */
+    private fun applyGeometry(expanded: Boolean) {
         val lp = params ?: return
         val view = root ?: return
-        if (lp.height == height) return
-        lp.height = height
+        if (expanded) {
+            lp.width = WindowManager.LayoutParams.MATCH_PARENT
+            lp.height = WindowManager.LayoutParams.MATCH_PARENT
+            lp.gravity = Gravity.TOP
+            lp.x = 0
+            lp.y = 0
+        } else {
+            lp.width = zoneW
+            lp.height = zoneH
+            lp.gravity = Gravity.TOP or Gravity.END
+            lp.x = 0
+            lp.y = zoneTop
+        }
         try {
             windowManager.updateViewLayout(view, lp)
         } catch (e: Exception) {
-            Log.w(TAG, "Falha ao redimensionar a janela", e)
+            Log.w(TAG, "Falha ao ajustar a janela", e)
         }
     }
 
@@ -384,6 +445,7 @@ internal class ShadeWindow(private val service: AccessibilityService) : PanelAct
         } catch (_: Exception) {
         }
         if (locked && phase != Phase.IDLE) detach()
+        view.invalidate()
     }
 
     private fun registerScreenReceiver() {
@@ -439,6 +501,17 @@ internal class ShadeWindow(private val service: AccessibilityService) : PanelAct
 
     override fun openVolume() = launch(Intent(Settings.Panel.ACTION_VOLUME))
 
+    override fun openSettings() = launch(Intent(Settings.ACTION_SETTINGS))
+
+    override fun openAirplane() = launch(Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS))
+
+    override fun openAlarms() = launch(Intent(AlarmClock.ACTION_SHOW_ALARMS))
+
+    override fun showPowerMenu() {
+        service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_POWER_DIALOG)
+        collapse()
+    }
+
     override fun requestWriteSettings() = launch(
         Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${service.packageName}")),
     )
@@ -461,5 +534,13 @@ internal class ShadeWindow(private val service: AccessibilityService) : PanelAct
     private companion object {
         const val TAG = "PixelControlCenter"
         const val SYSTEM_UI = "com.android.systemui"
+
+        // Faixa do gesto (marcada pelo usuário no print): lado direito, altura do meio-alto.
+        const val ZONE_WIDTH_FRACTION = 0.18f   // da menor dimensão da tela
+        const val ZONE_TOP_FRACTION = 0.105f    // da altura da tela
+        const val ZONE_HEIGHT_FRACTION = 0.235f // da altura da tela
+
+        // Quanto o painel acompanha o dedo (>1 = abre com arrasto mais curto).
+        const val DRAG_GAIN = 1.5f
     }
 }

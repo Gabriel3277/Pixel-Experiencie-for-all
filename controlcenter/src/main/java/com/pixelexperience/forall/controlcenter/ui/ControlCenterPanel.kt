@@ -3,44 +3,98 @@ package com.pixelexperience.forall.controlcenter.ui
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.pixelexperience.forall.controlcenter.PanelActions
 import com.pixelexperience.forall.controlcenter.PanelState
 import com.pixelexperience.forall.controlcenter.R
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
-/** Altura do conteúdo do painel (sem a barra de status), em dp. */
-internal const val PANEL_CONTENT_DP = 252
+/** Altura da área do painel (cartão + margens), sem a barra de status, em dp. */
+internal const val PANEL_CONTENT_DP = 388
+
+/** Cores do painel: tons de verde (da cor dinâmica do sistema), como no Android 17. */
+private class PanelColors(
+    val panel: Color,
+    val tileOff: Color,
+    val tileOn: Color,
+    val onTileOn: Color,
+    val onTileOff: Color,
+    val onPanel: Color,
+)
+
+@Composable
+private fun rememberPanelColors(): PanelColors {
+    val cs = MaterialTheme.colorScheme
+    val dark = isSystemInDarkTheme()
+    return remember(cs, dark) {
+        if (dark) {
+            PanelColors(
+                panel = lerp(Color(0xFF0F1511), cs.primary, 0.18f),
+                tileOff = lerp(Color(0xFF0A0F0B), cs.primary, 0.08f),
+                tileOn = cs.primary,
+                onTileOn = cs.onPrimary,
+                onTileOff = cs.onSurface,
+                onPanel = cs.onSurface,
+            )
+        } else {
+            PanelColors(
+                panel = lerp(Color.White, cs.primary, 0.14f),
+                tileOff = lerp(Color.White, cs.primary, 0.26f),
+                tileOn = cs.primary,
+                onTileOn = cs.onPrimary,
+                onTileOff = cs.onSurface,
+                onPanel = cs.onSurface,
+            )
+        }
+    }
+}
 
 /**
- * Painel no estilo Android 17 / Material 3 Expressive:
- * tiles largos em pílula, tiles pequenos, cores dinâmicas e cantos bem arredondados.
+ * Painel no estilo Android 17 / Material 3 Expressive: cartão flutuante verde,
+ * barras grossas de brilho e volume, tiles largos e redondos.
  */
 @Composable
 internal fun ControlCenterPanel(
@@ -59,74 +113,294 @@ internal fun ControlCenterPanel(
         }
     }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        shape = RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp),
+    val c = rememberPanelColors()
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(start = 12.dp, end = 12.dp, top = topInset + 8.dp, bottom = 8.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(
-                start = 16.dp,
-                end = 16.dp,
-                top = topInset + 12.dp,
-                bottom = 16.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = c.panel,
+            shape = RoundedCornerShape(36.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                WideTile(
-                    modifier = Modifier.weight(1f),
-                    icon = R.drawable.cc_ic_wifi,
-                    title = stringResource(R.string.cc_tile_internet),
-                    subtitle = state.internetSubtitle,
-                    active = state.internetActive,
-                    onClick = actions::openInternet,
-                )
-                WideTile(
-                    modifier = Modifier.weight(1f),
-                    icon = R.drawable.cc_ic_bluetooth,
-                    title = stringResource(R.string.cc_tile_bluetooth),
-                    subtitle = state.bluetoothSubtitle,
-                    active = state.bluetoothActive,
-                    onClick = actions::openBluetooth,
-                )
-            }
+                // Topo: configurações e desligar
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    HeaderButton(
+                        icon = R.drawable.cc_ic_settings,
+                        label = stringResource(R.string.cc_settings),
+                        tint = c.onPanel,
+                        onClick = actions::openSettings,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    HeaderButton(
+                        icon = R.drawable.cc_ic_power,
+                        label = stringResource(R.string.cc_power),
+                        tint = c.onPanel,
+                        onClick = actions::showPowerMenu,
+                    )
+                }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                SmallTile(
-                    modifier = Modifier.weight(1f),
-                    icon = R.drawable.cc_ic_flashlight,
-                    label = stringResource(R.string.cc_tile_flashlight),
-                    active = state.torchOn,
-                    enabled = state.hasTorch,
-                    onClick = state::toggleTorch,
-                )
-                SmallTile(
-                    modifier = Modifier.weight(1f),
-                    icon = R.drawable.cc_ic_rotate,
-                    label = stringResource(R.string.cc_tile_rotate),
-                    active = state.autoRotate,
-                    onClick = {
-                        if (state.canWriteSettings) state.toggleRotation()
-                        else actions.requestWriteSettings()
-                    },
-                )
-                SmallTile(
-                    modifier = Modifier.weight(1f),
-                    icon = R.drawable.cc_ic_volume,
-                    label = stringResource(R.string.cc_tile_volume),
-                    active = false,
-                    onClick = actions::openVolume,
-                )
-            }
+                // Brilho
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PillSlider(
+                        modifier = Modifier.weight(1f),
+                        value = state.brightness,
+                        onValueChange = state::updateBrightness,
+                        enabled = state.canWriteSettings,
+                        disabledHint = stringResource(R.string.cc_brightness_permission),
+                        onDisabledClick = actions::requestWriteSettings,
+                        trackColor = c.tileOff,
+                        fillColor = c.tileOn,
+                        hintColor = c.onTileOff,
+                    )
+                    CircleButton(
+                        icon = R.drawable.cc_ic_brightness_auto,
+                        label = stringResource(R.string.cc_auto_brightness),
+                        active = state.autoBrightness,
+                        colors = c,
+                        onClick = {
+                            if (state.canWriteSettings) state.toggleAutoBrightness()
+                            else actions.requestWriteSettings()
+                        },
+                    )
+                }
 
-            BrightnessBar(state = state, actions = actions)
+                // Volume
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PillSlider(
+                        modifier = Modifier.weight(1f),
+                        value = state.volume,
+                        onValueChange = state::updateVolume,
+                        enabled = true,
+                        disabledHint = "",
+                        onDisabledClick = {},
+                        trackColor = c.tileOff,
+                        fillColor = c.tileOn,
+                        hintColor = c.onTileOff,
+                    )
+                    CircleButton(
+                        icon = R.drawable.cc_ic_more,
+                        label = stringResource(R.string.cc_more_volume),
+                        active = false,
+                        colors = c,
+                        onClick = actions::openVolume,
+                    )
+                }
+
+                // Tiles largos
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    WideTile(
+                        modifier = Modifier.weight(1f),
+                        icon = R.drawable.cc_ic_wifi,
+                        title = stringResource(R.string.cc_tile_internet),
+                        subtitle = state.internetSubtitle,
+                        active = state.internetActive,
+                        colors = c,
+                        onClick = actions::openInternet,
+                    )
+                    WideTile(
+                        modifier = Modifier.weight(1f),
+                        icon = R.drawable.cc_ic_bluetooth,
+                        title = stringResource(R.string.cc_tile_bluetooth),
+                        subtitle = state.bluetoothSubtitle,
+                        active = state.bluetoothActive,
+                        colors = c,
+                        onClick = actions::openBluetooth,
+                    )
+                }
+
+                // Tiles pequenos
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    SmallTile(
+                        modifier = Modifier.weight(1f),
+                        icon = R.drawable.cc_ic_flashlight,
+                        label = stringResource(R.string.cc_tile_flashlight),
+                        active = state.torchOn,
+                        enabled = state.hasTorch,
+                        colors = c,
+                        onClick = state::toggleTorch,
+                    )
+                    SmallTile(
+                        modifier = Modifier.weight(1f),
+                        icon = R.drawable.cc_ic_airplane,
+                        label = stringResource(R.string.cc_tile_airplane),
+                        active = state.airplaneOn,
+                        colors = c,
+                        onClick = actions::openAirplane,
+                    )
+                    SmallTile(
+                        modifier = Modifier.weight(1f),
+                        icon = R.drawable.cc_ic_rotate,
+                        label = stringResource(R.string.cc_tile_rotate),
+                        active = state.autoRotate,
+                        colors = c,
+                        onClick = {
+                            if (state.canWriteSettings) state.toggleRotation()
+                            else actions.requestWriteSettings()
+                        },
+                    )
+                    SmallTile(
+                        modifier = Modifier.weight(1f),
+                        icon = R.drawable.cc_ic_alarm,
+                        label = stringResource(R.string.cc_tile_alarm),
+                        active = false,
+                        colors = c,
+                        onClick = actions::openAlarms,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeaderButton(
+    @DrawableRes icon: Int,
+    label: String,
+    tint: Color,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = painterResource(icon),
+            contentDescription = label,
+            tint = tint,
+            modifier = Modifier.size(22.dp),
+        )
+    }
+}
+
+@Composable
+private fun CircleButton(
+    @DrawableRes icon: Int,
+    label: String,
+    active: Boolean,
+    colors: PanelColors,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(56.dp)
+            .clip(CircleShape)
+            .background(if (active) colors.tileOn else colors.tileOff)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            painter = painterResource(icon),
+            contentDescription = label,
+            tint = if (active) colors.onTileOn else colors.onTileOff,
+            modifier = Modifier.size(24.dp),
+        )
+    }
+}
+
+/** Barra grossa em pílula: preenchimento verde e uma marca vertical no fim. */
+@Composable
+private fun PillSlider(
+    modifier: Modifier,
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    enabled: Boolean,
+    disabledHint: String,
+    onDisabledClick: () -> Unit,
+    trackColor: Color,
+    fillColor: Color,
+    hintColor: Color,
+) {
+    var widthPx by remember { mutableFloatStateOf(1f) }
+    val density = LocalDensity.current.density
+    val fraction = value.coerceIn(0f, 1f)
+
+    Box(
+        modifier = modifier
+            .height(56.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .background(trackColor)
+            .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f) }
+            .pointerInput(enabled) {
+                if (enabled) {
+                    detectTapGestures { offset ->
+                        onValueChange((offset.x / widthPx).coerceIn(0f, 1f))
+                    }
+                } else {
+                    detectTapGestures { onDisabledClick() }
+                }
+            }
+            .pointerInput(enabled) {
+                if (enabled) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { offset ->
+                            onValueChange((offset.x / widthPx).coerceIn(0f, 1f))
+                        },
+                    ) { change, _ ->
+                        change.consume()
+                        onValueChange((change.position.x / widthPx).coerceIn(0f, 1f))
+                    }
+                }
+            },
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        if (enabled) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(fraction)
+                    .background(fillColor),
+            )
+            Box(
+                modifier = Modifier
+                    .offset {
+                        IntOffset(
+                            (widthPx * fraction - 2f * density).roundToInt().coerceAtLeast(0),
+                            0,
+                        )
+                    }
+                    .width(4.dp)
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(fillColor),
+            )
+        } else {
+            Text(
+                text = disabledHint,
+                color = hintColor,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 20.dp),
+            )
         }
     }
 }
@@ -138,12 +412,12 @@ private fun WideTile(
     title: String,
     subtitle: String,
     active: Boolean,
+    colors: PanelColors,
     onClick: () -> Unit,
 ) {
-    val colors = MaterialTheme.colorScheme
-    val container = if (active) colors.primary else colors.surfaceContainerHighest
-    val content = if (active) colors.onPrimary else colors.onSurface
-    val badge = if (active) colors.onPrimary.copy(alpha = 0.18f) else colors.surfaceContainer
+    val container = if (active) colors.tileOn else colors.tileOff
+    val content = if (active) colors.onTileOn else colors.onTileOff
+    val badge = if (active) colors.onTileOn.copy(alpha = 0.18f) else colors.panel
 
     Row(
         modifier = modifier
@@ -194,12 +468,12 @@ private fun SmallTile(
     @DrawableRes icon: Int,
     label: String,
     active: Boolean,
+    colors: PanelColors,
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    val colors = MaterialTheme.colorScheme
-    val container = if (active) colors.primary else colors.surfaceContainerHighest
-    val content = if (active) colors.onPrimary else colors.onSurface
+    val container = if (active) colors.tileOn else colors.tileOff
+    val content = if (active) colors.onTileOn else colors.onTileOff
 
     Box(
         modifier = modifier
@@ -215,43 +489,5 @@ private fun SmallTile(
             tint = content.copy(alpha = if (enabled) 1f else 0.38f),
             modifier = Modifier.size(26.dp),
         )
-    }
-}
-
-@Composable
-private fun BrightnessBar(state: PanelState, actions: PanelActions) {
-    val colors = MaterialTheme.colorScheme
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)
-            .clip(RoundedCornerShape(28.dp))
-            .background(colors.surfaceContainerHighest)
-            .clickable(enabled = !state.canWriteSettings) { actions.requestWriteSettings() }
-            .padding(horizontal = 18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            painter = painterResource(R.drawable.cc_ic_brightness),
-            contentDescription = stringResource(R.string.cc_brightness),
-            tint = colors.onSurface,
-            modifier = Modifier.size(24.dp),
-        )
-        if (state.canWriteSettings) {
-            Slider(
-                value = state.brightness,
-                onValueChange = state::updateBrightness,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 8.dp),
-            )
-        } else {
-            Text(
-                text = stringResource(R.string.cc_brightness_permission),
-                color = colors.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(start = 12.dp),
-            )
-        }
     }
 }

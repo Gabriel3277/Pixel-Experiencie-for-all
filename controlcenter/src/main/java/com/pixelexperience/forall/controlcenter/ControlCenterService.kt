@@ -2,14 +2,15 @@ package com.pixelexperience.forall.controlcenter
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
+import android.content.res.Configuration
 import android.content.SharedPreferences
 import android.view.accessibility.AccessibilityEvent
 
 /**
  * Serviço de acessibilidade da Central de controle.
  *
- * Mantém uma janela fina (do tipo "overlay de acessibilidade") na barra de status.
- * Ao deslizar para baixo, a janela cresce, o painel do sistema é fechado e o nosso
+ * Mantém uma janela pequena (do tipo "overlay de acessibilidade") numa faixa do lado
+ * direito da tela. Ao deslizar para baixo nela, a janela cresce, o painel do sistema é fechado e o nosso
  * painel aparece. Não lê o conteúdo da tela.
  */
 class ControlCenterService : AccessibilityService() {
@@ -41,6 +42,11 @@ class ControlCenterService : AccessibilityService() {
         if (event == null) return
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         shade?.onWindowStateChanged(event.packageName?.toString())
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        shade?.onConfigurationChanged()
     }
 
     override fun onInterrupt() {

@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="cc_service_label">Central de controle Pixel</string>
-    <string name="cc_service_description">Mostra o painel da Central de controle quando você desliza para baixo a partir da barra de status e fecha o painel de notificações do sistema enquanto ele estiver aberto. Não lê o conteúdo da tela.</string>
+    <string name="cc_service_description">Mostra o painel da Central de controle quando você desliza para baixo numa faixa do lado direito da tela e fecha o painel de notificações do sistema enquanto ele estiver aberto. Não lê o conteúdo da tela.</string>
 
     <string name="cc_screen_title">Central de controle</string>
 
     <string name="cc_howto_title">Como usar</string>
-    <string name="cc_howto_body">Com o serviço ativado, deslize para baixo a partir da barra de status. O painel abre no lugar do painel rápido do sistema. Para fechar, deslize para cima ou toque fora do painel.</string>
+    <string name="cc_howto_body">Com o serviço ativado, deslize para baixo dentro da faixa do lado direito da tela (uma marquinha cinza mostra onde ela fica). O painel desce lá de cima. Para fechar, deslize para cima ou toque fora do painel.</string>
 
     <string name="cc_service_card_title">Serviço de acessibilidade</string>
     <string name="cc_service_card_body">Necessário para mostrar o painel sobre os outros apps. Não lê o conteúdo da tela.</string>
@@ -24,7 +24,7 @@
     <string name="cc_module_off_body">A Central de controle está desligada na tela inicial do app. Ative o módulo lá para o painel funcionar.</string>
 
     <string name="cc_limits_title">Nesta versão</string>
-    <string name="cc_limits_body">Internet e Bluetooth abrem o painel do sistema, porque o Android não deixa apps ligar ou desligar o Wi-Fi e o Bluetooth diretamente. Notificações e mídia chegam na próxima parte.</string>
+    <string name="cc_limits_body">Internet, Bluetooth e Modo avião abrem as telas do sistema, porque o Android não deixa apps ligar ou desligar esses itens diretamente. Notificações e mídia chegam na próxima parte.</string>
 
     <string name="cc_back">Voltar</string>
 
@@ -42,4 +42,11 @@
     <string name="cc_net_mobile">Dados móveis</string>
     <string name="cc_net_other">Conectado</string>
     <string name="cc_net_none">Sem conexão</string>
+    <string name="cc_tile_airplane">Modo avião</string>
+    <string name="cc_tile_alarm">Alarmes</string>
+    <string name="cc_settings">Configurações</string>
+    <string name="cc_power">Desligar</string>
+    <string name="cc_auto_brightness">Brilho automático</string>
+    <string name="cc_more_volume">Mais opções de volume</string>
+    <string name="cc_volume">Volume</string>
 </resources>
