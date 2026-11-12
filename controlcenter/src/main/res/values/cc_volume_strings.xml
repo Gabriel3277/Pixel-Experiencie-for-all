@@ -17,4 +17,11 @@
     <string name="cc_vp_crash_title">Último erro do painel</string>
     <string name="cc_vp_crash_copy">Copiar</string>
     <string name="cc_vp_crash_clear">Limpar</string>
+    <string name="cc_np_empty">Sem notificações</string>
+    <string name="cc_np_clear">Limpar tudo</string>
+    <string name="cc_np_access_title">Permitir acesso às notificações</string>
+    <string name="cc_np_access_body">Para mostrar suas notificações aqui, ative o acesso nas configurações. Elas ficam só no aparelho e o painel apenas exibe.</string>
+    <string name="cc_np_access_button">Abrir configurações</string>
+    <string name="cc_np_card_title">Acesso às notificações</string>
+    <string name="cc_np_card_body">Necessário para mostrar a lista de notificações no painel da esquerda.</string>
 </resources>

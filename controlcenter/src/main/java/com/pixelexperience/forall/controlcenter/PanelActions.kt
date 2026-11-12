@@ -10,5 +10,6 @@ internal interface PanelActions {
     fun openAlarms()
     fun showPowerMenu()
     fun requestWriteSettings()
+    fun requestNotificationAccess()
     fun collapse()
 }

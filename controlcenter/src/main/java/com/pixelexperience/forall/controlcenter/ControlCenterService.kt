@@ -18,6 +18,7 @@ import android.view.accessibility.AccessibilityEvent
 class ControlCenterService : AccessibilityService() {
 
     private var shade: ShadeWindow? = null
+    private var notifShade: ShadeWindow? = null
     private var volume: VolumeWindow? = null
 
     private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -40,9 +41,15 @@ class ControlCenterService : AccessibilityService() {
                 shade = ShadeWindow(this, showVolume = { volume?.show(expanded = true) })
                     .also { it.start() }
             }
+            if (notifShade == null) {
+                notifShade = ShadeWindow(this, kind = ShadeKind.NOTIFICATIONS)
+                    .also { it.start() }
+            }
         } else {
             shade?.stop()
             shade = null
+            notifShade?.stop()
+            notifShade = null
             volume?.stop()
             volume = null
         }
@@ -51,12 +58,15 @@ class ControlCenterService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        shade?.onWindowStateChanged(event.packageName?.toString())
+        val pkg = event.packageName?.toString()
+        shade?.onWindowStateChanged(pkg)
+        notifShade?.onWindowStateChanged(pkg)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         shade?.onConfigurationChanged()
+        notifShade?.onConfigurationChanged()
         volume?.onConfigurationChanged()
     }
 
@@ -94,6 +104,8 @@ class ControlCenterService : AccessibilityService() {
         ControlCenterPrefs.prefs(this).unregisterOnSharedPreferenceChangeListener(prefListener)
         shade?.stop()
         shade = null
+        notifShade?.stop()
+        notifShade = null
         volume?.stop()
         volume = null
     }

@@ -33,6 +33,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.pixelexperience.forall.controlcenter.ui.ControlCenterPanel
+import com.pixelexperience.forall.controlcenter.ui.NotificationsPanel
 import com.pixelexperience.forall.controlcenter.ui.PANEL_CONTENT_DP
 import com.pixelexperience.forall.themes.PixelTheme
 import kotlin.math.abs
@@ -50,9 +51,13 @@ import kotlin.math.roundToInt
  *    segue o dedo na MESMA janela, para o gesto não se perder.
  * 3. Ao soltar, o painel abre ou fecha conforme a posição e a velocidade.
  */
+/** CONTROL = central de controle (lado direito); NOTIFICATIONS = notificações (lado esquerdo). */
+internal enum class ShadeKind { CONTROL, NOTIFICATIONS }
+
 internal class ShadeWindow(
     private val service: AccessibilityService,
     private val showVolume: () -> Unit = {},
+    private val kind: ShadeKind = ShadeKind.CONTROL,
 ) : PanelActions {
 
     private enum class Phase { IDLE, OPENING, OPEN, CLOSING, SETTLING }
@@ -64,7 +69,8 @@ internal class ShadeWindow(
     private val flingPx = 700f * density
 
     private val owner = OverlayOwner()
-    private val panelState = PanelState(service)
+    private val panelState by lazy { PanelState(service) }
+    private val edge = if (kind == ShadeKind.NOTIFICATIONS) Gravity.START else Gravity.END
 
     private var root: ShadeRoot? = null
     private var params: WindowManager.LayoutParams? = null
@@ -84,6 +90,7 @@ internal class ShadeWindow(
     private var startX = 0f
     private var moved = false
     private var downOnScrim = false
+    private var closeAllowed = true
     private var lastDismissAt = 0L
 
     private val screenReceiver = object : BroadcastReceiver() {
@@ -118,10 +125,10 @@ internal class ShadeWindow(
             flags,
             PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.TOP or Gravity.END
+            gravity = Gravity.TOP or edge
             x = 0
             y = zoneTop
-            title = "PixelControlCenterShade"
+            title = "PixelShade$kind"
             layoutInDisplayCutoutMode =
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
         }
@@ -198,7 +205,7 @@ internal class ShadeWindow(
             if (keyguard?.isKeyguardLocked == true) return
             val w = 4f * density
             val h = 56f * density
-            val right = width - 10f * density
+            val right = if (kind == ShadeKind.NOTIFICATIONS) 10f * density + w else width - 10f * density
             val top = (height - h) / 2f
             handleRect.set(right - w, top, right, top + h)
             canvas.drawRoundRect(handleRect, w / 2f, w / 2f, handlePaint)
@@ -213,10 +220,11 @@ internal class ShadeWindow(
                 startX = ev.rawX
                 moved = false
                 downOnScrim = false
+                closeAllowed = canStartClose(ev.rawY)
             }
             MotionEvent.ACTION_MOVE -> {
                 val dy = startY - ev.rawY
-                if (dy > touchSlop * 2 && dy > abs(startX - ev.rawX)) {
+                if (closeAllowed && dy > touchSlop * 2 && dy > abs(startX - ev.rawX)) {
                     beginClose(ev)
                     return true
                 }
@@ -284,10 +292,11 @@ internal class ShadeWindow(
                 startX = ev.rawX
                 moved = false
                 downOnScrim = ev.y > panelHeightPx
+                closeAllowed = canStartClose(ev.rawY)
             }
             MotionEvent.ACTION_MOVE -> {
                 if (abs(ev.rawY - startY) > touchSlop) moved = true
-                if (startY - ev.rawY > touchSlop * 2) beginClose(ev)
+                if (closeAllowed && startY - ev.rawY > touchSlop * 2) beginClose(ev)
             }
             MotionEvent.ACTION_UP -> {
                 if (downOnScrim && !moved) settle(false) // toque fora do painel
@@ -295,6 +304,13 @@ internal class ShadeWindow(
         }
         return true
     }
+
+    /**
+     * Central de controle: qualquer arrasto para cima fecha. Notificações: a lista rola,
+     * então só fecha arrastando da alça de baixo (ou do fundo escurecido).
+     */
+    private fun canStartClose(y: Float): Boolean =
+        kind == ShadeKind.CONTROL || y > panelHeightPx - 64f * density
 
     private fun beginClose(ev: MotionEvent) {
         phase = Phase.CLOSING
@@ -326,11 +342,15 @@ internal class ShadeWindow(
             setContent {
                 PixelTheme(dynamicColor = true) {
                     val topInset = with(LocalDensity.current) { statusBarPx.toDp() }
-                    ControlCenterPanel(
-                        state = panelState,
-                        topInset = topInset,
-                        actions = this@ShadeWindow,
-                    )
+                    if (kind == ShadeKind.NOTIFICATIONS) {
+                        NotificationsPanel(topInset = topInset, actions = this@ShadeWindow)
+                    } else {
+                        ControlCenterPanel(
+                            state = panelState,
+                            topInset = topInset,
+                            actions = this@ShadeWindow,
+                        )
+                    }
                 }
             }
         }
@@ -397,7 +417,11 @@ internal class ShadeWindow(
         val w = dm.widthPixels
         val h = dm.heightPixels
         statusBarPx = readStatusBarHeight()
-        panelHeightPx = statusBarPx + (PANEL_CONTENT_DP * density).roundToInt()
+        panelHeightPx = if (kind == ShadeKind.NOTIFICATIONS) {
+            (h * NOTIF_HEIGHT_FRACTION).roundToInt()
+        } else {
+            statusBarPx + (PANEL_CONTENT_DP * density).roundToInt()
+        }
         zoneW = max((min(w, h) * ZONE_WIDTH_FRACTION).roundToInt(), (56 * density).roundToInt())
         zoneH = (h * ZONE_HEIGHT_FRACTION).roundToInt()
         zoneTop = (h * ZONE_TOP_FRACTION).roundToInt()
@@ -416,7 +440,7 @@ internal class ShadeWindow(
         } else {
             lp.width = zoneW
             lp.height = zoneH
-            lp.gravity = Gravity.TOP or Gravity.END
+            lp.gravity = Gravity.TOP or edge
             lp.x = 0
             lp.y = zoneTop
         }
@@ -523,6 +547,9 @@ internal class ShadeWindow(
         Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${service.packageName}")),
     )
 
+    override fun requestNotificationAccess() =
+        launch(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+
     override fun collapse() {
         if (phase == Phase.IDLE) return
         settle(false)
@@ -549,5 +576,8 @@ internal class ShadeWindow(
 
         // Quanto o painel acompanha o dedo (>1 = abre com arrasto mais curto).
         const val DRAG_GAIN = 1.5f
+
+        // Altura do painel de notificações (fração da tela).
+        const val NOTIF_HEIGHT_FRACTION = 0.82f
     }
 }

@@ -20,6 +20,17 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/cc_accessibility_config" />
         </service>
+
+        <!-- Lista de notificações do painel. O usuário libera em "Acesso às notificações". -->
+        <service
+            android:name=".PanelNotificationService"
+            android:exported="true"
+            android:label="@string/cc_service_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

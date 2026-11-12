@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.pixelexperience.forall.controlcenter.ControlCenterStatus
 import com.pixelexperience.forall.controlcenter.CrashLog
+import com.pixelexperience.forall.controlcenter.NotificationStore
 import com.pixelexperience.forall.controlcenter.R
 
 /**
@@ -55,12 +56,14 @@ fun ControlCenterScreen(
     var serviceOn by remember { mutableStateOf(ControlCenterStatus.isServiceEnabled(context)) }
     var canWrite by remember { mutableStateOf(ControlCenterStatus.canWriteSettings(context)) }
     var crash by remember { mutableStateOf(CrashLog.read(context)) }
+    var notifOn by remember { mutableStateOf(NotificationStore.hasAccess(context)) }
 
     // Ao voltar das telas de Configurações, relê o estado real.
     LifecycleResumeEffect(Unit) {
         serviceOn = ControlCenterStatus.isServiceEnabled(context)
         canWrite = ControlCenterStatus.canWriteSettings(context)
         crash = CrashLog.read(context)
+        notifOn = NotificationStore.hasAccess(context)
         onPauseOrDispose { }
     }
 
@@ -122,6 +125,21 @@ fun ControlCenterScreen(
                             Settings.ACTION_MANAGE_WRITE_SETTINGS,
                             Uri.parse("package:${context.packageName}"),
                         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                },
+            )
+
+            StatusCard(
+                title = stringResource(R.string.cc_np_card_title),
+                body = stringResource(R.string.cc_np_card_body),
+                status = stringResource(if (notifOn) R.string.cc_service_on else R.string.cc_service_off),
+                ok = notifOn,
+                buttonText = stringResource(R.string.cc_np_access_button),
+                showButton = !notifOn,
+                onClick = {
+                    context.startActivity(
+                        Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                     )
                 },
             )
