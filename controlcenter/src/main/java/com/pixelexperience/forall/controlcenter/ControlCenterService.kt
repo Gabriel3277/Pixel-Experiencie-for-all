@@ -26,6 +26,7 @@ class ControlCenterService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        CrashLog.install(applicationContext)
         ControlCenterPrefs.prefs(this).registerOnSharedPreferenceChangeListener(prefListener)
         applyEnabled()
     }

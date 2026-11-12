@@ -264,7 +264,7 @@ private fun ModePicker(
         modifier = Modifier
             .clip(RoundedCornerShape(18.dp))
             .background(bg)
-            .padding(pad),
+            .padding(pad.coerceAtLeast(0.dp)),
     ) {
         for ((mode, icon, label) in modes) {
             val selected = state.ringerMode == mode

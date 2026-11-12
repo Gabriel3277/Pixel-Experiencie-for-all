@@ -14,4 +14,7 @@
     <string name="cc_vp_mode_ring">Tocar</string>
     <string name="cc_vp_settings">Configurações de som</string>
     <string name="cc_vp_captions">Legendas</string>
+    <string name="cc_vp_crash_title">Último erro do painel</string>
+    <string name="cc_vp_crash_copy">Copiar</string>
+    <string name="cc_vp_crash_clear">Limpar</string>
 </resources>

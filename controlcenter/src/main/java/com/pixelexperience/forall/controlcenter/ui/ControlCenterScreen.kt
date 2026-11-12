@@ -1,5 +1,7 @@
 package com.pixelexperience.forall.controlcenter.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -35,6 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.pixelexperience.forall.controlcenter.ControlCenterStatus
+import com.pixelexperience.forall.controlcenter.CrashLog
 import com.pixelexperience.forall.controlcenter.R
 
 /**
@@ -50,11 +54,13 @@ fun ControlCenterScreen(
     val context = LocalContext.current
     var serviceOn by remember { mutableStateOf(ControlCenterStatus.isServiceEnabled(context)) }
     var canWrite by remember { mutableStateOf(ControlCenterStatus.canWriteSettings(context)) }
+    var crash by remember { mutableStateOf(CrashLog.read(context)) }
 
     // Ao voltar das telas de Configurações, relê o estado real.
     LifecycleResumeEffect(Unit) {
         serviceOn = ControlCenterStatus.isServiceEnabled(context)
         canWrite = ControlCenterStatus.canWriteSettings(context)
+        crash = CrashLog.read(context)
         onPauseOrDispose { }
     }
 
@@ -119,6 +125,41 @@ fun ControlCenterScreen(
                     )
                 },
             )
+
+            crash?.let { text ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                    ),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.cc_vp_crash_title),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        SelectionContainer {
+                            Text(
+                                text = text.take(1800),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = {
+                                context.getSystemService(ClipboardManager::class.java)
+                                    ?.setPrimaryClip(ClipData.newPlainText("erro", text))
+                            }) { Text(stringResource(R.string.cc_vp_crash_copy)) }
+                            Button(onClick = {
+                                CrashLog.clear(context)
+                                crash = null
+                            }) { Text(stringResource(R.string.cc_vp_crash_clear)) }
+                        }
+                    }
+                }
+            }
 
             InfoCard(
                 title = stringResource(R.string.cc_howto_title),
