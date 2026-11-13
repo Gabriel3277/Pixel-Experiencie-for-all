@@ -1,36 +1,18 @@
 package com.pixelexperience.forall.controlcenter.ui
 
-import androidx.annotation.DrawableRes
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -38,33 +20,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.pixelexperience.forall.controlcenter.PanelActions
 import com.pixelexperience.forall.controlcenter.PanelState
 import com.pixelexperience.forall.controlcenter.R
 import kotlinx.coroutines.delay
-import kotlin.math.min
 
-/** Altura da área do painel (cartão + margens), sem a barra de status, em dp. */
+/** Mantido por compatibilidade: o cartão agora tem altura própria (varia com os blocos). */
 internal const val PANEL_CONTENT_DP = 388
 
 /** Cores do painel: tons de verde (da cor dinâmica do sistema), como no Android 17. */
@@ -104,16 +78,43 @@ internal fun rememberPanelColors(): PanelColors {
     }
 }
 
-/**
- * Painel no estilo Android 17 / Material 3 Expressive: cartão flutuante verde,
- * sliders em pílula com alça, tiles que morfam de círculo para quadrado
- * arredondado ao ligar (com animação elástica).
- */
+/** Versão independente (guarda o próprio layout e o Edit Mode). */
 @Composable
 internal fun ControlCenterPanel(
     state: PanelState,
     topInset: Dp,
     actions: PanelActions,
+) {
+    val ctx = LocalContext.current
+    var layout by remember { mutableStateOf(TileLayoutStore.load(ctx)) }
+    var editing by remember { mutableStateOf(false) }
+    ControlCard(
+        state = state,
+        topInset = topInset,
+        actions = actions,
+        layout = layout,
+        editing = editing,
+        onLayoutChange = {
+            layout = it
+            TileLayoutStore.save(ctx, it)
+        },
+        onEditingChange = { editing = it },
+    )
+}
+
+/**
+ * Cartão da central de controle (Android 17 / Material 3 Expressive): topo, brilho
+ * e a grade de blocos editável. A altura acompanha a quantidade de blocos.
+ */
+@Composable
+internal fun ControlCard(
+    state: PanelState,
+    topInset: Dp,
+    actions: PanelActions,
+    layout: List<TilePlace>,
+    editing: Boolean,
+    onLayoutChange: (List<TilePlace>) -> Unit,
+    onEditingChange: (Boolean) -> Unit,
 ) {
     DisposableEffect(state) {
         state.start()
@@ -130,11 +131,15 @@ internal fun ControlCenterPanel(
 
     Box(
         modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
             .padding(start = 12.dp, end = 12.dp, top = topInset + 8.dp, bottom = 8.dp),
     ) {
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(
+                    spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
+                ),
             color = c.panel.copy(alpha = 0.86f),
             shape = RoundedCornerShape(36.dp),
         ) {
@@ -142,31 +147,56 @@ internal fun ControlCenterPanel(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                // Topo: configurações e desligar
+                // Topo
                 Row(
-                    modifier = Modifier.entrance(0)
+                    modifier = Modifier
+                        .entrance(0)
                         .fillMaxWidth()
                         .height(40.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    HeaderButton(
-                        icon = R.drawable.cc_ic_settings,
-                        label = stringResource(R.string.cc_settings),
-                        tint = c.onPanel,
-                        onClick = actions::openSettings,
-                    )
-                    Spacer(Modifier.weight(1f))
-                    HeaderButton(
-                        icon = R.drawable.cc_ic_power,
-                        label = stringResource(R.string.cc_power),
-                        tint = c.onPanel,
-                        onClick = actions::showPowerMenu,
-                    )
+                    if (editing) {
+                        Text(
+                            text = "Editar blocos",
+                            color = c.onPanel,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        HeaderButton(
+                            icon = R.drawable.cc_ic_check,
+                            label = "Concluir",
+                            tint = c.onPanel,
+                            onClick = { onEditingChange(false) },
+                        )
+                    } else {
+                        HeaderButton(
+                            icon = R.drawable.cc_ic_pencil,
+                            label = "Editar blocos",
+                            tint = c.onPanel,
+                            onClick = { onEditingChange(true) },
+                        )
+                        HeaderButton(
+                            icon = R.drawable.cc_ic_settings,
+                            label = stringResource(R.string.cc_settings),
+                            tint = c.onPanel,
+                            onClick = actions::openSettings,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        HeaderButton(
+                            icon = R.drawable.cc_ic_power,
+                            label = stringResource(R.string.cc_power),
+                            tint = c.onPanel,
+                            onClick = actions::showPowerMenu,
+                        )
+                    }
                 }
 
-                // Brilho
+                // Brilho (o slider de volume foi removido)
                 Row(
-                    modifier = Modifier.entrance(1).fillMaxWidth(),
+                    modifier = Modifier
+                        .entrance(1)
+                        .fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -196,103 +226,15 @@ internal fun ControlCenterPanel(
                     )
                 }
 
-                // Volume
-                Row(
-                    modifier = Modifier.entrance(2).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    PillSlider(
-                        modifier = Modifier.weight(1f),
-                        value = state.volume,
-                        onValueChange = state::updateVolume,
-                        enabled = true,
-                        disabledHint = "",
-                        onDisabledClick = {},
-                        trackColor = c.tileOff,
-                        fillColor = c.tileOn,
-                        hintColor = c.onTileOff,
-                        icon = if (state.volume < 0.02f) R.drawable.cc_ic_volume_off else R.drawable.cc_ic_volume,
-                        iconTint = c.onTileOn,
-                    )
-                    // Botão ⋮ sempre verde-claro, como na referência.
-                    CircleButton(
-                        icon = R.drawable.cc_ic_more,
-                        label = stringResource(R.string.cc_more_volume),
-                        active = true,
-                        activeRadius = 28.dp,
-                        colors = c,
-                        onClick = actions::openVolume,
-                    )
-                }
-
-                // Tiles largos: o quadradinho do ícone é que liga e desliga.
-                Row(
-                    modifier = Modifier.entrance(3).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    WideTile(
-                        modifier = Modifier.weight(1f),
-                        icon = R.drawable.cc_ic_wifi,
-                        title = stringResource(R.string.cc_tile_internet),
-                        subtitle = state.internetSubtitle,
-                        active = state.internetActive,
-                        colors = c,
-                        onClick = actions::openInternet,
-                    )
-                    WideTile(
-                        modifier = Modifier.weight(1f),
-                        icon = R.drawable.cc_ic_bluetooth,
-                        title = stringResource(R.string.cc_tile_bluetooth),
-                        subtitle = state.bluetoothSubtitle,
-                        active = state.bluetoothActive,
-                        colors = c,
-                        onClick = actions::openBluetooth,
-                    )
-                }
-
-                // Tiles pequenos
-                Row(
-                    modifier = Modifier.entrance(4).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    SmallTile(
-                        modifier = Modifier.weight(1f),
-                        icon = R.drawable.cc_ic_flashlight,
-                        label = stringResource(R.string.cc_tile_flashlight),
-                        active = state.torchOn,
-                        enabled = state.hasTorch,
-                        colors = c,
-                        onClick = state::toggleTorch,
-                    )
-                    SmallTile(
-                        modifier = Modifier.weight(1f),
-                        icon = R.drawable.cc_ic_airplane,
-                        label = stringResource(R.string.cc_tile_airplane),
-                        active = state.airplaneOn,
-                        colors = c,
-                        onClick = actions::openAirplane,
-                    )
-                    SmallTile(
-                        modifier = Modifier.weight(1f),
-                        icon = R.drawable.cc_ic_rotate,
-                        label = stringResource(R.string.cc_tile_rotate),
-                        active = state.autoRotate,
-                        colors = c,
-                        onClick = {
-                            if (state.canWriteSettings) state.toggleRotation()
-                            else actions.requestWriteSettings()
-                        },
-                    )
-                    SmallTile(
-                        modifier = Modifier.weight(1f),
-                        icon = R.drawable.cc_ic_alarm,
-                        label = stringResource(R.string.cc_tile_alarm),
-                        active = false,
-                        colors = c,
-                        onClick = actions::openAlarms,
-                    )
-                }
+                // Blocos (sem espaços vazios; o volume liberou uma linha)
+                TileGrid(
+                    layout = layout,
+                    editing = editing,
+                    onLayoutChange = onLayoutChange,
+                    state = state,
+                    actions = actions,
+                    colors = c,
+                )
             }
         }
     }

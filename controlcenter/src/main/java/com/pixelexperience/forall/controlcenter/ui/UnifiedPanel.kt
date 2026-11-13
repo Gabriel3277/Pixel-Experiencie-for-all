@@ -70,20 +70,43 @@ internal fun UnifiedPanel(
     }
     val canClear = NotificationStore.items.any { it.clearable }
 
+    // Layout dos blocos e Edit Mode.
+    var layout by remember { mutableStateOf(TileLayoutStore.load(context)) }
+    var editing by remember { mutableStateOf(false) }
+
     // Pilhas abertas (por app) e grupos (um por app, na ordem da notificação mais recente).
     val expanded = remember { mutableStateMapOf<String, Boolean>() }
     val groups = NotificationStore.items.groupBy { it.pkg }.entries.toList()
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(topInset + PANEL_CONTENT_DP.dp),
-        ) {
-            ControlCenterPanel(state = state, topInset = topInset, actions = actions)
-        }
+        ControlCard(
+            state = state,
+            topInset = topInset,
+            actions = actions,
+            layout = layout,
+            editing = editing,
+            onLayoutChange = {
+                layout = it
+                TileLayoutStore.save(context, it)
+            },
+            onEditingChange = { editing = it },
+        )
 
-        Column(
+        if (editing) {
+            TileCatalogPicker(
+                layout = layout,
+                colors = c,
+                onAdd = { spec ->
+                    layout = layout + TilePlace(spec.id, 1)
+                    TileLayoutStore.save(context, layout)
+                },
+                onReset = { layout = TileLayoutStore.reset(context) },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+            )
+        } else Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
