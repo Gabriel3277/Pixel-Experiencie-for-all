@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.pixelexperience.forall"
-        minSdk = 31          // Android 12+ (cobre o Android 14 e usa Material You)
+        minSdk = 34          // Android 12+ (cobre o Android 14 e usa Material You)
         targetSdk = 34       // Android 14
         versionCode = 3
         versionName = "0.3.0"
