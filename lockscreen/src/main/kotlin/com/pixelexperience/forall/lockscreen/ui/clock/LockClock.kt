@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
 package com.pixelexperience.forall.lockscreen.ui.clock
 
 import android.text.format.DateFormat
