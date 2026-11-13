@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,9 +32,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +53,8 @@ import com.pixelexperience.forall.controlcenter.PanelActions
 import com.pixelexperience.forall.controlcenter.PanelState
 import com.pixelexperience.forall.controlcenter.R
 import kotlinx.coroutines.delay
+
+private val FooterHeight = 72.dp
 
 /**
  * Painel único (Android 17): central de controle em cima e as notificações
@@ -145,6 +154,7 @@ internal fun UnifiedPanel(
                 }
             }
 
+            // A lista ocupa toda a área; o rodapé fica por cima (sem corte seco).
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 when {
                     !hasAccess -> AccessCard(c, actions)
@@ -155,7 +165,25 @@ internal fun UnifiedPanel(
                         modifier = Modifier.align(Alignment.Center),
                     )
                     else -> LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                            .drawWithContent {
+                                drawContent()
+                                val top = size.height - FooterHeight.toPx() - 40.dp.toPx()
+                                val end = size.height - FooterHeight.toPx() + 8.dp.toPx()
+                                drawRect(
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(Color.Black, Color.Transparent),
+                                        startY = top,
+                                        endY = end,
+                                    ),
+                                    topLeft = Offset(0f, top),
+                                    size = Size(size.width, size.height - top),
+                                    blendMode = BlendMode.DstIn,
+                                )
+                            },
+                        contentPadding = PaddingValues(bottom = FooterHeight),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         itemsIndexed(groups, key = { _, g -> g.key }) { index, g ->
@@ -180,51 +208,52 @@ internal fun UnifiedPanel(
                         }
                     }
                 }
-            }
 
-            // Rodapé: Gerenciar e fechar (^). Arrastar daqui para cima também fecha.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(72.dp)
-                    .padding(top = 8.dp, bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
+                // Rodapé: Gerenciar e fechar (^).
+                Row(
                     modifier = Modifier
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(c.tileOff)
-                        .clickable {
-                            try {
-                                context.startActivity(
-                                    Intent("android.settings.ALL_APPS_NOTIFICATION_SETTINGS")
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                                )
-                            } catch (_: Exception) {
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(FooterHeight)
+                        .padding(top = 8.dp, bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .height(48.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(c.tileOff)
+                            .clickable {
+                                try {
+                                    context.startActivity(
+                                        Intent("android.settings.ALL_APPS_NOTIFICATION_SETTINGS")
+                                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                    )
+                                } catch (_: Exception) {
+                                }
+                                actions.collapse()
                             }
-                            actions.collapse()
-                        }
-                        .padding(horizontal = 24.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "Gerenciar",
-                        color = c.onTileOff,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
-                Box(modifier = Modifier.weight(1f))
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(c.tileOff)
-                        .clickable { actions.collapse() },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ChevronUp(color = c.onTileOff)
+                            .padding(horizontal = 24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "Gerenciar",
+                            color = c.onTileOff,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                    Box(modifier = Modifier.weight(1f))
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(c.tileOff)
+                            .clickable { actions.collapse() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        ChevronUp(color = c.onTileOff)
+                    }
                 }
             }
         }
