@@ -96,17 +96,20 @@ fun LockClock(
 @Composable
 private fun ClockFace(style: ClockStyle, hh: String, mm: String, scale: Float, h: Alignment.Horizontal, tint: Color) {
     when (style) {
-        ClockStyle.STACKED -> Column(horizontalAlignment = h) {
-            Digits(hh, 118f, 500, tint, scale)
-            Digits(mm, 118f, 500, tint.copy(alpha = 0.85f), scale)
+        ClockStyle.STACKED -> Row(verticalAlignment = Alignment.CenterVertically) {
+            Digits(hh, 92f, 500, tint, scale)
+            Colon(92f, tint, scale)
+            Digits(mm, 92f, 500, tint.copy(alpha = 0.85f), scale)
         }
-        ClockStyle.BOLD -> Column(horizontalAlignment = h) {
-            Digits(hh, 126f, 800, tint, scale)
-            Digits(mm, 126f, 800, tint.copy(alpha = 0.85f), scale)
+        ClockStyle.BOLD -> Row(verticalAlignment = Alignment.CenterVertically) {
+            Digits(hh, 92f, 800, tint, scale)
+            Colon(92f, tint, scale)
+            Digits(mm, 92f, 800, tint.copy(alpha = 0.85f), scale)
         }
-        ClockStyle.OUTLINE -> Column(horizontalAlignment = h) {
-            Digits(hh, 118f, 700, tint, scale, outline = true)
-            Digits(mm, 118f, 700, tint, scale, outline = true)
+        ClockStyle.OUTLINE -> Row(verticalAlignment = Alignment.CenterVertically) {
+            Digits(hh, 92f, 700, tint, scale, outline = true)
+            Colon(92f, tint, scale)
+            Digits(mm, 92f, 700, tint, scale, outline = true)
         }
         ClockStyle.INFLATE -> FontStack(FontFamily(Font(R.font.inflate)), hh, mm, tint, scale, h)
         ClockStyle.GROWTH -> FontStack(FontFamily(Font(R.font.growth)), hh, mm, tint, scale, h)
@@ -162,8 +165,9 @@ private fun Digits(text: String, sizeSp: Float, weight: Int, color: Color, scale
 
 @Composable
 private fun FontStack(f: FontFamily, hh: String, mm: String, tint: Color, scale: Float, h: Alignment.Horizontal) {
-    Column(horizontalAlignment = h) {
-        Digits(hh, 118f, 700, tint, scale, family = f)
-        Digits(mm, 118f, 700, tint.copy(alpha = 0.85f), scale, family = f)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Digits(hh, 92f, 700, tint, scale, family = f)
+        Colon(92f, tint, scale)
+        Digits(mm, 92f, 700, tint.copy(alpha = 0.85f), scale, family = f)
     }
 }

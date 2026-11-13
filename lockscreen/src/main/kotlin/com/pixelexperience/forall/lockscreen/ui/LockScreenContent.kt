@@ -306,15 +306,6 @@ fun LockScreenContent(
                     onClearAll = onClearAll,
                     modifier = Modifier.weight(1f).padding(horizontal = 12.dp).layerFx(e2::value, dragFn, 0.6f, 1.2f, distFn),
                 )
-                val bob = if (preview) 0f else {
-                    val t = rememberInfiniteTransition(label = "hint")
-                    val v by t.animateFloat(
-                        0f, -6f,
-                        infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-                        label = "bob",
-                    )
-                    v
-                }
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 36.dp, vertical = 22.dp)
                         .layerFx(e3::value, dragFn, 1f, 1.6f, distFn),
@@ -322,11 +313,6 @@ fun LockScreenContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     ShortcutSlot(settings.leftShortcut, torchOn, palette, settings, onShortcut)
-                    Box(
-                        Modifier.offset { IntOffset(0, bob.dp.roundToPx()) }
-                            .width(40.dp).height(5.dp).clip(RoundedCornerShape(50))
-                            .background(Color.White.copy(alpha = 0.55f))
-                    )
                     ShortcutSlot(settings.rightShortcut, torchOn, palette, settings, onShortcut)
                 }
             }
