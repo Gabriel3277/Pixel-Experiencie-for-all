@@ -370,23 +370,6 @@ internal class ShadeWindow(
         panel?.translationY = -panelHeightPx * (1f - p)
         root?.setBackgroundColor(Color.argb((90f * p).toInt(), 0, 0, 0))
         applyBlur(p)
-        applyBlur(p)
-    }
-
-    /** Desfoca o que fica atras do painel (Android 12+). */
-    @Suppress("DEPRECATION")
-    private fun applyBlur(p: Float) {
-        if (android.os.Build.VERSION.SDK_INT < 31) return
-        val lp = params ?: return
-        val view = root ?: return
-        val radius = (28f * density * p).toInt()
-        if (lp.blurBehindRadius == radius) return
-        lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
-        lp.blurBehindRadius = radius
-        try {
-            windowManager.updateViewLayout(view, lp)
-        } catch (_: Exception) {
-        }
     }
 
     /** Desfoca o que fica atras do painel (Android 12+). */
@@ -438,7 +421,6 @@ internal class ShadeWindow(
         anim = null
         releaseTracker()
         root?.removeAllViews()
-        applyBlur(0f)
         applyBlur(0f)
         root?.setBackgroundColor(Color.TRANSPARENT)
         panel = null
