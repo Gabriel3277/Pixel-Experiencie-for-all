@@ -30,6 +30,6 @@ include(":controlcenter")
 // Módulos planejados (entram nas próximas partes, um por vez):
 // include(":widgets")
 // include(":notifications")
-// include(":lockscreen")
+include(":lockscreen")
 // include(":sounds")
 // include(":extras")

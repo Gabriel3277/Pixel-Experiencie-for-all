@@ -44,7 +44,7 @@ dependencies {
     implementation(project(":themes"))
     implementation(project(":launcher"))
     implementation(project(":controlcenter"))
-
+implementation(project(":lockscreen"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
