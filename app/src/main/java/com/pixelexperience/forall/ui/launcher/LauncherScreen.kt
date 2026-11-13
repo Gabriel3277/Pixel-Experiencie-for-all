@@ -1,5 +1,12 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.pixelexperience.forall.ui.launcher
 
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
@@ -68,7 +75,7 @@ fun LauncherScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.launcher_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = onBack, shapes = IconButtonDefaults.shapes()) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                             contentDescription = stringResource(R.string.back),

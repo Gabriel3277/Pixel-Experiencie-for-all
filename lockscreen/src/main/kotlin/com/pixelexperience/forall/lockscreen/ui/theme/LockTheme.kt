@@ -1,5 +1,12 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.pixelexperience.forall.lockscreen.ui.theme
 
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.animation.core.spring
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -36,7 +43,7 @@ fun lockFont(weight: Int): FontFamily =
 
 @Composable
 fun LockTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
+    MaterialExpressiveTheme(
         colorScheme = dynamicDarkColorScheme(LocalContext.current),
         shapes = LockShapes,
         content = content,

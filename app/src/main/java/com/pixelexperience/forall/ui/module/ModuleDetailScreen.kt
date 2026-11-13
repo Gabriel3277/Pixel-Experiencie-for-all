@@ -1,5 +1,12 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.pixelexperience.forall.ui.module
 
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,7 +47,7 @@ fun ModuleDetailScreen(
             TopAppBar(
                 title = { Text(module?.let { stringResource(it.info.title) } ?: "") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = onBack, shapes = IconButtonDefaults.shapes()) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                             contentDescription = stringResource(R.string.back),
@@ -92,7 +99,7 @@ fun ModuleDetailScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             if (available) {
-                Button(onClick = onOpenAppearance) {
+                Button(onClick = onOpenAppearance, shapes = ButtonDefaults.shapes()) {
                     Text(stringResource(R.string.module_open_appearance))
                 }
             }

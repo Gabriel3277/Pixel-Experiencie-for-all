@@ -1,6 +1,12 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.pixelexperience.forall.lockscreen.ui.settings
 
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import android.Manifest
 import android.app.PendingIntent
 import android.content.pm.PackageManager
@@ -128,7 +134,7 @@ fun LockSettingsScreen(onBack: () -> Unit) {
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar") }
+            IconButton(onClick = onBack, shapes = IconButtonDefaults.shapes()) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar") }
             Text("Tela de bloqueio Pixel", style = MaterialTheme.typography.titleLarge)
         }
         PhonePreview(s, wallpaper, demo)
@@ -288,7 +294,7 @@ private fun PermissionRow(label: String, granted: Boolean, onClick: () -> Unit) 
                 color = if (granted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
             )
         }
-        if (!granted) FilledTonalButton(onClick = onClick) { Text("Conceder") }
+        if (!granted) FilledTonalButton(onClick = onClick, shapes = ButtonDefaults.shapes()) { Text("Conceder") }
     }
 }
 
@@ -297,7 +303,7 @@ private fun PermissionRow(label: String, granted: Boolean, onClick: () -> Unit) 
 private fun <T> ChipRow(options: List<T>, selected: T, label: (T) -> String, onSelect: (T) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { o ->
-            FilterChip(selected = o == selected, onClick = { onSelect(o) }, label = { Text(label(o)) })
+            ToggleButton(checked = o == selected, onCheckedChange = { onSelect(o) }, shapes = ToggleButtonDefaults.shapes()) { Text(label(o)) }
         }
     }
 }
