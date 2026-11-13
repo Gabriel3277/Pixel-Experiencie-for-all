@@ -38,6 +38,11 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
+import androidx.compose.ui.text.font.FontWeight
+import com.pixelexperience.forall.lockscreen.R
 
 @Composable
 fun LockClock(
@@ -102,6 +107,12 @@ private fun ClockFace(style: ClockStyle, hh: String, mm: String, scale: Float, h
             Digits(hh, 118f, 700, tint, scale, outline = true)
             Digits(mm, 118f, 700, tint, scale, outline = true)
         }
+        ClockStyle.INFLATE -> FontStack(FontFamily(Font(R.font.inflate)), hh, mm, tint, scale, h)
+        ClockStyle.GROWTH -> FontStack(FontFamily(Font(R.font.growth)), hh, mm, tint, scale, h)
+        ClockStyle.ROTATION -> FontStack(FontFamily(Font(R.font.rotation)), hh, mm, tint, scale, h)
+        ClockStyle.FRAME -> FontStack(FontFamily(Font(R.font.frameweather)), hh, mm, tint, scale, h)
+        ClockStyle.RUBY -> FontStack(FontFamily(Font(R.font.ruby)), hh, mm, tint, scale, h)
+        ClockStyle.FLEX -> FontStack(FontFamily(Font(R.font.google_sans_flex, FontWeight.Bold, variationSettings = FontVariation.Settings(FontVariation.weight(800)))), hh, mm, tint, scale, h)
         ClockStyle.INLINE -> Row(verticalAlignment = Alignment.CenterVertically) {
             Digits(hh, 84f, 400, tint, scale)
             Colon(84f, tint, scale)
@@ -122,7 +133,7 @@ private fun Colon(sizeSp: Float, color: Color, scale: Float) {
 }
 
 @Composable
-private fun Digits(text: String, sizeSp: Float, weight: Int, color: Color, scale: Float, outline: Boolean = false) {
+private fun Digits(text: String, sizeSp: Float, weight: Int, color: Color, scale: Float, outline: Boolean = false, family: FontFamily? = null) {
     val size = (sizeSp * scale).sp
     AnimatedContent(
         targetState = text,
@@ -135,7 +146,7 @@ private fun Digits(text: String, sizeSp: Float, weight: Int, color: Color, scale
         Text(
             text = t,
             style = TextStyle(
-                fontFamily = lockFont(weight),
+                fontFamily = family ?: lockFont(weight),
                 fontSize = size,
                 lineHeight = size * 0.88f,
                 letterSpacing = (-2).sp,
@@ -145,5 +156,13 @@ private fun Digits(text: String, sizeSp: Float, weight: Int, color: Color, scale
                 lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
             ),
         )
+    }
+}
+
+@Composable
+private fun FontStack(f: FontFamily, hh: String, mm: String, tint: Color, scale: Float, h: Alignment.Horizontal) {
+    Column(horizontalAlignment = h) {
+        Digits(hh, 118f, 700, tint, scale, family = f)
+        Digits(mm, 118f, 700, tint.copy(alpha = 0.85f), scale, family = f)
     }
 }

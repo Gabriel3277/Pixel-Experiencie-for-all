@@ -23,7 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 enum class ClockStyle(val label: String) {
-    STACKED("Empilhado"), INLINE("Em linha"), COMPACT("Compacto"), BOLD("Negrito"), OUTLINE("Contorno")
+    STACKED("Empilhado"), INLINE("Em linha"), COMPACT("Compacto"), BOLD("Negrito"), OUTLINE("Contorno"), INFLATE("Inflado"), GROWTH("Crescer"), ROTATION("Rotação"), FRAME("Moldura"), RUBY("Ruby"), FLEX("Flex")
 }
 
 enum class ClockAlign(val label: String) { START("Esquerda"), CENTER("Centro") }
