@@ -32,7 +32,7 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import com.pixelexperience.forall.controlcenter.ui.ControlCenterPanel
+import com.pixelexperience.forall.controlcenter.ui.UnifiedPanel
 import com.pixelexperience.forall.controlcenter.ui.NotificationsPanel
 import com.pixelexperience.forall.controlcenter.ui.PANEL_CONTENT_DP
 import com.pixelexperience.forall.themes.PixelTheme
@@ -310,7 +310,7 @@ internal class ShadeWindow(
      * então só fecha arrastando da alça de baixo (ou do fundo escurecido).
      */
     private fun canStartClose(y: Float): Boolean =
-        kind == ShadeKind.CONTROL || y > panelHeightPx - 64f * density
+        y > panelHeightPx - 80f * density
 
     private fun beginClose(ev: MotionEvent) {
         phase = Phase.CLOSING
@@ -343,9 +343,9 @@ internal class ShadeWindow(
                 PixelTheme(dynamicColor = true) {
                     val topInset = with(LocalDensity.current) { statusBarPx.toDp() }
                     if (kind == ShadeKind.NOTIFICATIONS) {
-                        NotificationsPanel(topInset = topInset, actions = this@ShadeWindow)
+                        UnifiedPanel(state = panelState, topInset = topInset, actions = this@ShadeWindow)
                     } else {
-                        ControlCenterPanel(
+                        UnifiedPanel(
                             state = panelState,
                             topInset = topInset,
                             actions = this@ShadeWindow,
@@ -436,9 +436,9 @@ internal class ShadeWindow(
         val h = dm.heightPixels
         statusBarPx = readStatusBarHeight()
         panelHeightPx = if (kind == ShadeKind.NOTIFICATIONS) {
-            (h * NOTIF_HEIGHT_FRACTION).roundToInt()
+            h
         } else {
-            statusBarPx + (PANEL_CONTENT_DP * density).roundToInt()
+            h
         }
         zoneW = max((min(w, h) * ZONE_WIDTH_FRACTION).roundToInt(), (56 * density).roundToInt())
         zoneH = (h * ZONE_HEIGHT_FRACTION).roundToInt()

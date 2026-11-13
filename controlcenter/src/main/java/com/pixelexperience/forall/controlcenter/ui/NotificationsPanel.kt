@@ -175,7 +175,7 @@ internal fun NotificationsPanel(
 }
 
 @Composable
-private fun AccessCard(c: PanelColors, actions: PanelActions) {
+internal fun AccessCard(c: PanelColors, actions: PanelActions) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -213,7 +213,7 @@ private fun AccessCard(c: PanelColors, actions: PanelActions) {
 }
 
 @Composable
-private fun NotifCard(
+internal fun NotifCard(
     item: NotifItem,
     c: PanelColors,
     onOpen: () -> Unit,
