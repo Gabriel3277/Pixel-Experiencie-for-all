@@ -1,5 +1,7 @@
 package com.pixelexperience.forall.lockscreen.ui.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -102,8 +104,8 @@ fun ShortcutButton(
 ) {
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
-    val sc by animateFloatAsState(if (pressed) 0.84f else 1f, LockMotion.bouncy(), label = "press")
-    val corner by animateFloatAsState(if (pressed) 30f else 50f, LockMotion.spatial(), label = "corner")
+    val sc by animateFloatAsState(if (pressed) 0.92f else 1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium), label = "press")
+    val corner by animateFloatAsState(if (pressed) 18f else if (active) 30f else 50f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessLow), label = "corner")
     val haptic = LocalHapticFeedback.current
     GlassCard(
         modifier = modifier
