@@ -51,7 +51,7 @@ fun PixelNavHost(viewModel: MainViewModel, state: MainUiState) {
                         PixelModuleId.CONTROL_CENTER -> Routes.CONTROL_CENTER
                         else -> Routes.module(id)
                     }
-                    navController.navigate(route)
+                    if (id == PixelModuleId.LOCKSCREEN) com.pixelexperience.forall.lockscreen.LockScreenModule.openSettings(context) else navController.navigate(route)
                 },
                 onOpenAppearance = { navController.navigate(Routes.APPEARANCE) },
                 onToggleModule = viewModel::setModuleEnabled,

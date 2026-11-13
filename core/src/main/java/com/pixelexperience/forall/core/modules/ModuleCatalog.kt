@@ -13,7 +13,7 @@ object ModuleCatalog {
         PixelModuleInfo(PixelModuleId.WIDGETS, R.string.module_widgets_title, R.string.module_widgets_desc, ModuleStatus.PLANNED),
         PixelModuleInfo(PixelModuleId.CONTROL_CENTER, R.string.module_controlcenter_title, R.string.module_controlcenter_desc, ModuleStatus.AVAILABLE),
         PixelModuleInfo(PixelModuleId.NOTIFICATIONS, R.string.module_notifications_title, R.string.module_notifications_desc, ModuleStatus.PLANNED),
-        PixelModuleInfo(PixelModuleId.LOCKSCREEN, R.string.module_lockscreen_title, R.string.module_lockscreen_desc, ModuleStatus.PLANNED),
+        PixelModuleInfo(PixelModuleId.LOCKSCREEN, R.string.module_lockscreen_title, R.string.module_lockscreen_desc, ModuleStatus.AVAILABLE),
         PixelModuleInfo(PixelModuleId.SOUNDS, R.string.module_sounds_title, R.string.module_sounds_desc, ModuleStatus.PLANNED),
         PixelModuleInfo(PixelModuleId.EXTRAS, R.string.module_extras_title, R.string.module_extras_desc, ModuleStatus.PLANNED),
     )
