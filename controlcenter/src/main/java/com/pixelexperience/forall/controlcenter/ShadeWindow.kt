@@ -503,9 +503,9 @@ internal class ShadeWindow(
         } else {
             h
         }
-        zoneW = max((min(w, h) * ZONE_WIDTH_FRACTION).roundToInt(), (56 * density).roundToInt())
-        zoneH = (h * ZONE_HEIGHT_FRACTION).roundToInt()
-        zoneTop = (h * ZONE_TOP_FRACTION).roundToInt()
+        zoneW = (28 * density).roundToInt()
+        zoneH = (96 * density).roundToInt()
+        zoneTop = (h * ZONE_TOP_FRACTION).roundToInt() + ((h * ZONE_HEIGHT_FRACTION).roundToInt() - zoneH) / 2
     }
 
     /** expanded = tela toda (painel aberto/arrastando); senão, só a faixa do gesto. */

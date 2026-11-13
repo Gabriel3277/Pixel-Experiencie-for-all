@@ -41,10 +41,6 @@ class ControlCenterService : AccessibilityService() {
                 shade = ShadeWindow(this, showVolume = { volume?.show(expanded = true) })
                     .also { it.start() }
             }
-            if (notifShade == null) {
-                notifShade = ShadeWindow(this, kind = ShadeKind.NOTIFICATIONS)
-                    .also { it.start() }
-            }
         } else {
             shade?.stop()
             shade = null
