@@ -5,7 +5,7 @@
     para fechar o painel do sistema e o próprio painel quando necessário.
     Também recebe SÓ as teclas de volume, para mostrar o painel de volume próprio.
 -->
-<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+<accessibility-service android:canTakeScreenshot="true" xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeWindowStateChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagRequestFilterKeyEvents"

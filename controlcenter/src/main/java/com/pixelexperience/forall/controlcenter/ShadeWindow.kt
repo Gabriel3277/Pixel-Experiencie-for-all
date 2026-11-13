@@ -251,6 +251,7 @@ internal class ShadeWindow(
         phase = Phase.OPENING
         tracker = VelocityTracker.obtain().also { it.addMovement(ev) }
 
+        captureScreen()
         applyGeometry(expanded = true)
         dismissSystemShade()
         attachPanel()
@@ -337,6 +338,27 @@ internal class ShadeWindow(
 
     private fun attachPanel() {
         val host = root ?: return
+        val bv = android.widget.ImageView(service).apply {
+            scaleType = android.widget.ImageView.ScaleType.FIT_XY
+            alpha = 0f
+            setColorFilter(Color.argb(110, 0, 0, 0))
+            setImageBitmap(shot)
+            if (android.os.Build.VERSION.SDK_INT >= 31) {
+                setRenderEffect(
+                    android.graphics.RenderEffect.createBlurEffect(
+                        24f, 24f, android.graphics.Shader.TileMode.CLAMP,
+                    ),
+                )
+            }
+        }
+        host.addView(
+            bv,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        blurView = bv
         val view = ComposeView(service).apply {
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setContent {
@@ -370,6 +392,7 @@ internal class ShadeWindow(
         panel?.translationY = -panelHeightPx * (1f - p)
         root?.setBackgroundColor(Color.argb((90f * p).toInt(), 0, 0, 0))
         applyBlur(p)
+        blurView?.alpha = p
     }
 
     /** Desfoca o que fica atras do painel (Android 12+). */
@@ -384,6 +407,44 @@ internal class ShadeWindow(
         lp.blurBehindRadius = radius
         try {
             windowManager.updateViewLayout(view, lp)
+        } catch (_: Exception) {
+        }
+    }
+
+    private var blurView: android.widget.ImageView? = null
+    private var shot: android.graphics.Bitmap? = null
+
+    /** Print da tela, reduzido: vira o fundo desfocado do painel (Android 11+). */
+    private fun captureScreen() {
+        if (android.os.Build.VERSION.SDK_INT < 30) return
+        try {
+            service.takeScreenshot(
+                android.view.Display.DEFAULT_DISPLAY,
+                ContextCompat.getMainExecutor(service),
+                object : AccessibilityService.TakeScreenshotCallback {
+                    override fun onSuccess(result: AccessibilityService.ScreenshotResult) {
+                        try {
+                            val hw = result.hardwareBuffer
+                            val full = android.graphics.Bitmap.wrapHardwareBuffer(hw, result.colorSpace)
+                            val soft = full?.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                            hw.close()
+                            if (soft != null) {
+                                val small = android.graphics.Bitmap.createScaledBitmap(
+                                    soft,
+                                    max(1, soft.width / 12),
+                                    max(1, soft.height / 12),
+                                    true,
+                                )
+                                shot = small
+                                blurView?.setImageBitmap(small)
+                            }
+                        } catch (_: Exception) {
+                        }
+                    }
+
+                    override fun onFailure(errorCode: Int) {}
+                },
+            )
         } catch (_: Exception) {
         }
     }
@@ -422,6 +483,8 @@ internal class ShadeWindow(
         releaseTracker()
         root?.removeAllViews()
         applyBlur(0f)
+        blurView = null
+        shot = null
         root?.setBackgroundColor(Color.TRANSPARENT)
         panel = null
         progress = 0f
