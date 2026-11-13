@@ -135,7 +135,7 @@ internal fun ControlCenterPanel(
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = c.panel,
+            color = c.panel.copy(alpha = 0.86f),
             shape = RoundedCornerShape(36.dp),
         ) {
             Column(
