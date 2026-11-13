@@ -1,3 +1,4 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package com.pixelexperience.forall.lockscreen.ui.settings
 
