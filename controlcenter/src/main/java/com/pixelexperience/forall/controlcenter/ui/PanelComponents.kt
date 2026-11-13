@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -213,8 +214,9 @@ internal fun CircleButton(
 
 /**
  * Slider em pílula (Android 17): preenchimento verde-claro, um espaço, uma alça
- * vertical fina e o resto da trilha escuro. A alça afina e cresce enquanto
- * o dedo está na barra.
+ * vertical fina e o resto da trilha escuro. Sempre sobra uma pílula mínima de
+ * cada lado da alça (mesmo em 0% e 100%), como na referência. A alça afina
+ * e cresce enquanto o dedo está na barra.
  */
 @Composable
 internal fun PillSlider(
@@ -227,7 +229,10 @@ internal fun PillSlider(
     trackColor: Color,
     fillColor: Color,
     hintColor: Color,
+    @DrawableRes icon: Int? = null,
+    iconTint: Color = Color.Unspecified,
 ) {
+    val density = LocalDensity.current
     var widthPx by remember { mutableFloatStateOf(1f) }
     var tapPressed by remember { mutableStateOf(false) }
     var dragPressed by remember { mutableStateOf(false) }
@@ -244,7 +249,18 @@ internal fun PillSlider(
         animationSpec = if (pressed) snap() else tween(250),
         label = "sliderValue",
     )
-    val handleColor = lerp(fillColor, Color.White, 0.55f)
+    val handleColor = lerp(fillColor, Color.White, 0.35f)
+
+    // Trecho em que o centro da alça pode andar: sobra uma pílula mínima
+    // (22 dp) + o espaço (8 dp) de cada lado.
+    val minPillPx = with(density) { 56.dp.toPx() }
+    val gapPx = with(density) { 8.dp.toPx() }
+
+    fun fractionAt(x: Float): Float {
+        val start = minPillPx + gapPx
+        val end = widthPx - minPillPx - gapPx
+        return if (end > start) ((x - start) / (end - start)).coerceIn(0f, 1f) else 0f
+    }
 
     Box(
         modifier = modifier
@@ -258,9 +274,7 @@ internal fun PillSlider(
                             tryAwaitRelease()
                             tapPressed = false
                         },
-                        onTap = { offset ->
-                            onValueChange((offset.x / widthPx).coerceIn(0f, 1f))
-                        },
+                        onTap = { offset -> onValueChange(fractionAt(offset.x)) },
                     )
                 } else {
                     detectTapGestures { onDisabledClick() }
@@ -271,13 +285,13 @@ internal fun PillSlider(
                     detectHorizontalDragGestures(
                         onDragStart = { offset ->
                             dragPressed = true
-                            onValueChange((offset.x / widthPx).coerceIn(0f, 1f))
+                            onValueChange(fractionAt(offset.x))
                         },
                         onDragEnd = { dragPressed = false },
                         onDragCancel = { dragPressed = false },
                     ) { change, _ ->
                         change.consume()
-                        onValueChange((change.position.x / widthPx).coerceIn(0f, 1f))
+                        onValueChange(fractionAt(change.position.x))
                     }
                 }
             },
@@ -287,15 +301,18 @@ internal fun PillSlider(
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
+                val minPill = 56.dp.toPx()
                 val gap = 8.dp.toPx()
 
-                val handleW = 5.dp.toPx() - 1.5f.dp.toPx() * press
-                val handleTop = 4.dp.toPx() - 2.dp.toPx() * press
-                val edge = 2.dp.toPx() + handleW / 2f
-                val x = (shown * w).coerceIn(edge, w - edge)
+                val handleW = 4.5f.dp.toPx() - 1.2f.dp.toPx() * press
+                val handleTop = 5.dp.toPx() - 2.dp.toPx() * press
+
+                val start = minPill + gap
+                val end = w - minPill - gap
+                val x = if (end > start) start + shown * (end - start) else w / 2f
 
                 val fillRight = x - gap
-                if (fillRight > 6.dp.toPx()) {
+                if (fillRight > 0f) {
                     drawRoundRect(
                         color = fillColor,
                         topLeft = Offset.Zero,
@@ -306,7 +323,7 @@ internal fun PillSlider(
 
                 val restLeft = x + gap
                 val restWidth = w - restLeft
-                if (restWidth > 6.dp.toPx()) {
+                if (restWidth > 0f) {
                     drawRoundRect(
                         color = trackColor,
                         topLeft = Offset(restLeft, 0f),
@@ -320,6 +337,16 @@ internal fun PillSlider(
                     topLeft = Offset(x - handleW / 2f, handleTop),
                     size = Size(handleW, h - 2f * handleTop),
                     cornerRadius = CornerRadius(handleW / 2f),
+                )
+            }
+            if (icon != null) {
+                Icon(
+                    painter = painterResource(icon),
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier
+                        .padding(start = 16.dp)
+                        .size(24.dp),
                 )
             }
         } else {
@@ -391,7 +418,7 @@ internal fun WideTile(
             active = active,
             colors = colors,
             inactiveRadius = 26.dp,
-            activeRadius = 18.dp,
+            activeRadius = 16.dp,
             onClick = null,
         ) { fg, pop ->
             Icon(
@@ -449,5 +476,28 @@ internal fun SmallTile(
                 .size(26.dp)
                 .then(pop),
         )
+    }
+}
+
+/**
+ * Animação de entrada do painel: cada bloco sobe, cresce e aparece em
+ * sequência (escalonado pelo [index]).
+ */
+@Composable
+internal fun Modifier.entrance(index: Int): Modifier {
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        delay(index * 45L)
+        progress.animateTo(
+            1f,
+            spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow),
+        )
+    }
+    return this.graphicsLayer {
+        val v = progress.value
+        alpha = v.coerceIn(0f, 1f)
+        translationY = (1f - v) * 28.dp.toPx()
+        scaleX = 0.9f + 0.1f * v
+        scaleY = 0.9f + 0.1f * v
     }
 }

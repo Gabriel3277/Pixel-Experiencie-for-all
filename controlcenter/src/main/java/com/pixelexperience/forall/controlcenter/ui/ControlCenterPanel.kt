@@ -144,7 +144,7 @@ internal fun ControlCenterPanel(
             ) {
                 // Topo: configurações e desligar
                 Row(
-                    modifier = Modifier
+                    modifier = Modifier.entrance(0)
                         .fillMaxWidth()
                         .height(40.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -166,7 +166,7 @@ internal fun ControlCenterPanel(
 
                 // Brilho
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.entrance(1).fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -180,6 +180,8 @@ internal fun ControlCenterPanel(
                         trackColor = c.tileOff,
                         fillColor = c.tileOn,
                         hintColor = c.onTileOff,
+                        icon = R.drawable.cc_ic_brightness,
+                        iconTint = c.onTileOn,
                     )
                     CircleButton(
                         icon = R.drawable.cc_ic_brightness_auto,
@@ -196,7 +198,7 @@ internal fun ControlCenterPanel(
 
                 // Volume
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.entrance(2).fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -210,6 +212,8 @@ internal fun ControlCenterPanel(
                         trackColor = c.tileOff,
                         fillColor = c.tileOn,
                         hintColor = c.onTileOff,
+                        icon = if (state.volume < 0.02f) R.drawable.cc_ic_volume_off else R.drawable.cc_ic_volume,
+                        iconTint = c.onTileOn,
                     )
                     // Botão ⋮ sempre verde-claro, como na referência.
                     CircleButton(
@@ -224,7 +228,7 @@ internal fun ControlCenterPanel(
 
                 // Tiles largos: o quadradinho do ícone é que liga e desliga.
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.entrance(3).fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     WideTile(
@@ -249,7 +253,7 @@ internal fun ControlCenterPanel(
 
                 // Tiles pequenos
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.entrance(4).fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     SmallTile(
