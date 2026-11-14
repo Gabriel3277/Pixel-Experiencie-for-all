@@ -1,5 +1,6 @@
 package com.pixelexperience.forall.lockscreen.ui
 
+import android.app.ActivityOptions
 import android.app.KeyguardManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -41,6 +42,8 @@ class LockScreenActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
+        // barra de navegação realmente transparente (sem scrim automático) e ícones claros da status bar, como no Pixel
+        window.isNavigationBarContrastEnforced = false
         overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() { /* a tela de bloqueio ignora "voltar" */ }
@@ -65,7 +68,17 @@ class LockScreenActivity : ComponentActivity() {
                     torchOn = torch,
                     onShortcut = { runShortcut(it) },
                     onOpenNotification = { n ->
-                        unlock(onSuccess = { n.contentIntent?.let { pi -> runCatching { pi.send() } } })
+                        unlock(onSuccess = {
+                            n.contentIntent?.let { pi ->
+                                runCatching {
+                                    // Android 14+: o remetente precisa permitir explicitamente abrir a activity
+                                    val opts = ActivityOptions.makeBasic()
+                                        .setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+                                        .toBundle()
+                                    pi.send(this@LockScreenActivity, 0, null, null, null, null, opts)
+                                }
+                            }
+                        })
                     },
                     onDismissNotification = { LockNotificationListener.cancel(it) },
                     onClearAll = { LockNotificationListener.cancelAll() },
@@ -75,16 +88,24 @@ class LockScreenActivity : ComponentActivity() {
         }
     }
 
+    private var unlockPending = false
+
     private fun unlock(onSuccess: () -> Unit = {}, onFail: () -> Unit = {}) {
+        if (unlockPending) { onFail(); return }
+        unlockPending = true
         val km = getSystemService(KeyguardManager::class.java)
-        km.requestDismissKeyguard(this, object : KeyguardManager.KeyguardDismissCallback() {
-            override fun onDismissSucceeded() {
-                onSuccess()
-                finishAndRemoveTask()
-            }
-            override fun onDismissCancelled() { onFail() }
-            override fun onDismissError() { onFail() }
-        })
+        val started = runCatching {
+            km.requestDismissKeyguard(this, object : KeyguardManager.KeyguardDismissCallback() {
+                override fun onDismissSucceeded() {
+                    unlockPending = false
+                    onSuccess()
+                    finishAndRemoveTask()
+                }
+                override fun onDismissCancelled() { unlockPending = false; onFail() }
+                override fun onDismissError() { unlockPending = false; onFail() }
+            })
+        }.isSuccess
+        if (!started) { unlockPending = false; onFail() }
     }
 
     private fun launchAfterUnlock(intent: Intent) {
@@ -99,7 +120,7 @@ class LockScreenActivity : ComponentActivity() {
                 // câmera segura abre direto sobre o keyguard, sem pedir PIN
                 val ok = runCatching {
                     startActivity(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA_SECURE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                }.isSuccess
+                }.isSuccess // ActivityNotFoundException cai no fallback abaixo
                 if (!ok) launchAfterUnlock(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
             }
             ShortcutType.DIALER -> launchAfterUnlock(Intent(Intent.ACTION_DIAL))

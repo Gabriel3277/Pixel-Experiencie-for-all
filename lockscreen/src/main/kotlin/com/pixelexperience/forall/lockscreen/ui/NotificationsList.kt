@@ -121,7 +121,7 @@ private fun GroupCard(
     val multi = g.items.size > 1
     val first = g.items.first()
     val canExpand = multi || first.bigText.length > first.text.length + 3
-    val shape = RoundedCornerShape(28.dp)
+    val shape = RoundedCornerShape(32.dp)
     val arrow by animateFloatAsState(if (expanded) 180f else 0f, LockMotion.spatial(), label = "arrow")
     val stacked = multi && !expanded
 

@@ -89,7 +89,10 @@ import com.pixelexperience.forall.lockscreen.ui.clock.LockClock
 import com.pixelexperience.forall.lockscreen.ui.components.Backdrop
 import com.pixelexperience.forall.lockscreen.ui.components.LocalBackdrop
 import com.pixelexperience.forall.lockscreen.ui.components.ShortcutButton
+import androidx.compose.material3.ColorScheme
 import com.pixelexperience.forall.lockscreen.ui.theme.LockMotion
+import com.pixelexperience.forall.lockscreen.ui.theme.lockColorScheme
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -149,29 +152,47 @@ fun LockScreenContent(
     val ctx = LocalContext.current
     val density = LocalDensity.current
     val palette = wallpaper?.palette ?: LockPalette.Default
+    // Dynamic Color a partir do wallpaper: todos os papéis (clock, cards, atalhos) vêm do mesmo esquema tonal
+    val scheme = remember(palette.accent) { lockColorScheme(palette.accent) }
     val clockTint = when (settings.clockColor) {
-        ClockColor.DYNAMIC -> palette.clockTint
-        ClockColor.ACCENT -> palette.accent
+        ClockColor.DYNAMIC -> scheme.onPrimaryContainer
+        ClockColor.ACCENT -> scheme.primary
         ClockColor.WHITE -> Color.White
+    }
+    val clockTint2 = when (settings.clockColor) {
+        ClockColor.DYNAMIC -> scheme.onTertiaryContainer
+        ClockColor.ACCENT -> scheme.tertiary
+        ClockColor.WHITE -> Color.White.copy(alpha = 0.92f)
     }
     val scope = rememberCoroutineScope()
     val drag = remember { Animatable(0f) }
     var size by remember { mutableStateOf(IntSize.Zero) }
     val unlockDist = (size.height * 0.30f).coerceAtLeast(1f)
     val requestUnlock by rememberUpdatedState(onRequestUnlock)
+    // evita pedir o desbloqueio duas vezes (onDragStopped + onPostFling disparam juntos)
+    var unlocking by remember { mutableStateOf(false) }
 
     suspend fun settle(vy: Float) {
-        if (preview) return
+        if (preview || unlocking) return
         if (drag.value < -unlockDist * 0.45f || (drag.value < 0f && vy < -1800f)) {
+            unlocking = true
             drag.animateTo(-unlockDist * 1.2f, LockMotion.spatial())
-            requestUnlock({ ok -> if (!ok) scope.launch { drag.animateTo(0f, LockMotion.bouncy()) } })
+            requestUnlock { ok ->
+                if (!ok) {
+                    unlocking = false
+                    scope.launch { drag.animateTo(0f, LockMotion.bouncy()) }
+                }
+            }
         } else if (drag.value != 0f) {
             drag.animateTo(0f, LockMotion.bouncy())
         }
     }
 
     fun dragBy(dy: Float) {
-        scope.launch { drag.snapTo((drag.value + dy).coerceIn(-unlockDist * 1.2f, 0f)) }
+        if (unlocking) return
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            drag.snapTo((drag.value + dy).coerceIn(-unlockDist * 1.2f, 0f))
+        }
     }
 
     val connection = remember(unlockDist, preview) {
@@ -264,18 +285,32 @@ fun LockScreenContent(
                 )
             }
         }
-        // 2) scrim para legibilidade
+        // 2) scrim + integração com o relógio: gradiente de legibilidade, brilho tonal atrás dos números e vinheta
         Box(
             Modifier.fillMaxSize().drawBehind {
+                val w = this.size.width
+                val h = this.size.height
                 val d = settings.bgDim
                 val p = (-drag.value / unlockDist).coerceIn(0f, 1f)
                 drawRect(
                     Brush.verticalGradient(
-                        listOf(
-                            Color.Black.copy(alpha = (d * 0.6f + 0.1f * p).coerceIn(0f, 1f)),
-                            Color.Black.copy(alpha = (d * 0.25f + 0.05f * p).coerceIn(0f, 1f)),
-                            Color.Black.copy(alpha = (d * 0.9f + 0.1f + 0.1f * p).coerceIn(0f, 1f)),
-                        )
+                        0f to Color.Black.copy(alpha = (d * 0.55f + 0.08f + 0.1f * p).coerceIn(0f, 1f)),
+                        0.35f to Color.Black.copy(alpha = (d * 0.18f + 0.05f * p).coerceIn(0f, 1f)),
+                        0.70f to Color.Black.copy(alpha = (d * 0.35f + 0.05f + 0.08f * p).coerceIn(0f, 1f)),
+                        1f to Color.Black.copy(alpha = (d * 0.90f + 0.15f + 0.1f * p).coerceIn(0f, 1f)),
+                    )
+                )
+                val cy = settings.clockY * h + 150.dp.toPx()
+                drawRect(
+                    Brush.radialGradient(
+                        listOf(scheme.primary.copy(alpha = 0.17f * (1f - p)), Color.Transparent),
+                        center = Offset(w / 2f, cy), radius = w * 0.95f,
+                    )
+                )
+                drawRect(
+                    Brush.radialGradient(
+                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.30f)),
+                        center = Offset(w / 2f, h * 0.45f), radius = h * 0.78f,
                     )
                 )
             }
@@ -285,12 +320,13 @@ fun LockScreenContent(
             val insets = if (preview) Modifier.padding(top = 28.dp, bottom = 10.dp)
             else Modifier.statusBarsPadding().navigationBarsPadding()
             val clockTop = with(density) { (settings.clockY * size.height).toDp() }
-            val animatedTop by animateDpAsState(clockTop, LockMotion.spatial(), label = "clockY")
+            val animatedTopRaw by animateDpAsState(clockTop, LockMotion.spatial(), label = "clockY")
+            val animatedTop = animatedTopRaw.coerceAtLeast(0.dp) // a mola pode passar de 0 e gerar altura negativa
 
             Column(Modifier.fillMaxSize().then(insets)) {
                 Spacer(Modifier.height(animatedTop))
                 LockClock(
-                    style = settings.clockStyle, scale = settings.clockScale, align = settings.clockAlign, tint = clockTint,
+                    style = settings.clockStyle, scale = settings.clockScale, align = settings.clockAlign, tint = clockTint, tint2 = clockTint2,
                     modifier = Modifier.padding(horizontal = 28.dp).layerFx(e1::value, dragFn, 0.35f, 1.4f, distFn),
                 )
                 Spacer(Modifier.height(16.dp))
@@ -298,8 +334,8 @@ fun LockScreenContent(
                     items = shown,
                     grouped = settings.groupNotifications,
                     opacity = settings.cardOpacity,
-                    tint = palette.cardTint,
-                    accent = palette.accent,
+                    tint = scheme.surfaceContainerHigh,
+                    accent = scheme.primary,
                     preview = preview,
                     onOpen = onOpenNotification,
                     onDismiss = onDismissNotification,
@@ -307,13 +343,13 @@ fun LockScreenContent(
                     modifier = Modifier.weight(1f).padding(horizontal = 12.dp).layerFx(e2::value, dragFn, 0.6f, 1.2f, distFn),
                 )
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 36.dp, vertical = 22.dp)
+                    Modifier.fillMaxWidth().padding(horizontal = 40.dp, vertical = 26.dp)
                         .layerFx(e3::value, dragFn, 1f, 1.6f, distFn),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ShortcutSlot(settings.leftShortcut, torchOn, palette, settings, onShortcut)
-                    ShortcutSlot(settings.rightShortcut, torchOn, palette, settings, onShortcut)
+                    ShortcutSlot(settings.leftShortcut, torchOn, scheme, settings, onShortcut)
+                    ShortcutSlot(settings.rightShortcut, torchOn, scheme, settings, onShortcut)
                 }
             }
         }
@@ -322,15 +358,15 @@ fun LockScreenContent(
 
 @Composable
 private fun ShortcutSlot(
-    type: ShortcutType, torchOn: Boolean, palette: LockPalette, settings: LockSettings, onShortcut: (ShortcutType) -> Unit,
+    type: ShortcutType, torchOn: Boolean, scheme: ColorScheme, settings: LockSettings, onShortcut: (ShortcutType) -> Unit,
 ) {
     if (type == ShortcutType.NONE) {
-        Spacer(Modifier.size(60.dp))
+        Spacer(Modifier.size(64.dp))
     } else {
         ShortcutButton(
             icon = type.icon(torchOn), description = type.label,
             active = type == ShortcutType.FLASHLIGHT && torchOn,
-            accent = palette.accent, onAccent = palette.onAccent, tint = palette.cardTint,
+            accent = scheme.primary, onAccent = scheme.onPrimary, tint = scheme.surfaceContainerHighest,
             opacity = settings.cardOpacity, onClick = { onShortcut(type) },
         )
     }

@@ -1,7 +1,6 @@
 package com.pixelexperience.forall.lockscreen.ui.components
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
@@ -55,7 +55,7 @@ val LocalBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(28.dp),
+    shape: Shape = RoundedCornerShape(32.dp),
     tint: Color,
     opacity: Float,
     content: @Composable BoxScope.() -> Unit,
@@ -83,13 +83,23 @@ fun GlassCard(
                     }
                 }
                 drawRect(tint.copy(alpha = opacity.coerceIn(0f, 1f)))
+                // realce tonal no topo: dá volume de superfície elevada (M3)
+                drawRect(
+                    Brush.verticalGradient(
+                        0f to Color.White.copy(alpha = 0.07f * opacity.coerceIn(0f, 1f) * 2f),
+                        0.5f to Color.Transparent,
+                    )
+                )
             }
-            .border(0.7.dp, Color.White.copy(alpha = 0.10f), shape),
+            .border(0.8.dp, Color.White.copy(alpha = 0.12f), shape),
         content = content,
     )
 }
 
-/** Botão circular estilo Pixel: mola ao pressionar, canto que "morfa" e haptic. */
+/**
+ * Atalho estilo Pixel / M3 Expressive: forma que "morfa" por mola (squircle -> círculo quando ativo, mais quadrada ao pressionar),
+ * container tonal translúcido, preenchimento Dynamic Color ao ativar e haptic.
+ */
 @Composable
 fun ShortcutButton(
     icon: ImageVector,
@@ -104,12 +114,14 @@ fun ShortcutButton(
 ) {
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
-    val sc by animateFloatAsState(if (pressed) 0.92f else 1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium), label = "press")
-    val corner by animateFloatAsState(if (pressed) 18f else if (active) 30f else 50f, spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessLow), label = "corner")
+    val sc by animateFloatAsState(if (pressed) 0.90f else 1f, LockMotion.fastSpatial(), label = "press")
+    val corner by animateFloatAsState(if (pressed) 22f else if (active) 50f else 34f, LockMotion.fastSpatial(), label = "corner")
+    val fill by animateColorAsState(if (active) accent else Color.Transparent, LockMotion.effects(), label = "fill")
+    val iconTint by animateColorAsState(if (active) onAccent else Color.White, LockMotion.effects(), label = "iconTint")
     val haptic = LocalHapticFeedback.current
     GlassCard(
         modifier = modifier
-            .size(60.dp)
+            .size(64.dp)
             .graphicsLayer { scaleX = sc; scaleY = sc }
             .clickable(interactionSource = src, indication = null) {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -117,14 +129,14 @@ fun ShortcutButton(
             },
         shape = RoundedCornerShape(percent = corner.roundToInt().coerceIn(0, 50)),
         tint = tint,
-        opacity = if (active) 0f else opacity,
+        opacity = opacity,
     ) {
-        if (active) Box(Modifier.fillMaxSize().background(accent))
+        Box(Modifier.fillMaxSize().background(fill))
         Icon(
             imageVector = icon,
             contentDescription = description,
-            tint = if (active) onAccent else Color.White,
-            modifier = Modifier.align(Alignment.Center).size(26.dp),
+            tint = iconTint,
+            modifier = Modifier.align(Alignment.Center).size(28.dp),
         )
     }
 }
