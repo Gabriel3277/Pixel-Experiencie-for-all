@@ -193,9 +193,16 @@ class ClockWidgetPickerActivity : ComponentActivity() {
             return
         }
         try {
-            controller.startConfigure(this, id, REQ_RECONFIG)
+            val cn = controller.infoFor(id)!!.configure
+            @Suppress("DEPRECATION")
+            startActivityForResult(
+                Intent(android.appwidget.AppWidgetManager.ACTION_APPWIDGET_CONFIGURE)
+                    .setComponent(cn)
+                    .putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, id),
+                REQ_RECONFIG,
+            )
         } catch (e: Exception) {
-            message = "Não foi possível abrir a configuração."
+            message = "Falhou: ${e.javaClass.simpleName}"
         }
     }
 
