@@ -106,6 +106,7 @@ import com.pixelexperience.forall.lockscreen.data.LockSettings
 import com.pixelexperience.forall.lockscreen.data.ShortcutType
 import com.pixelexperience.forall.lockscreen.data.WallpaperRepository
 import com.pixelexperience.forall.lockscreen.data.WallpaperUi
+import com.pixelexperience.forall.lockscreen.notifications.LockAction
 import com.pixelexperience.forall.lockscreen.notifications.LockNotification
 import com.pixelexperience.forall.lockscreen.ui.clock.LockClock
 import com.pixelexperience.forall.lockscreen.ui.components.Backdrop
@@ -113,6 +114,7 @@ import com.pixelexperience.forall.lockscreen.ui.components.GlassCard
 import com.pixelexperience.forall.lockscreen.ui.components.LocalBackdrop
 import com.pixelexperience.forall.lockscreen.ui.components.ShortcutButton
 import androidx.compose.material3.ColorScheme
+import com.pixelexperience.forall.lockscreen.ui.theme.DateFont
 import com.pixelexperience.forall.lockscreen.ui.theme.LockMotion
 import com.pixelexperience.forall.lockscreen.ui.theme.lockColorScheme
 import kotlinx.coroutines.CoroutineStart
@@ -174,6 +176,7 @@ fun LockScreenContent(
     onOpenNotification: (LockNotification) -> Unit = {},
     onDismissNotification: (String) -> Unit = {},
     onClearAll: () -> Unit = {},
+    onAction: (LockAction) -> Unit = {},
     onRequestUnlock: ((Boolean) -> Unit) -> Unit = {},
 ) {
     val ctx = LocalContext.current
@@ -259,7 +262,12 @@ fun LockScreenContent(
     }
 
     // vidro dos cards: miniatura borrada do wallpaper (recalcula só quando o nível de blur muda)
-    val backdropImage by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null) { value = null }
+    val backdropImage by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wallpaper, settings.cardBlur) {
+        val w = wallpaper
+        value = if (w == null) null else withContext(Dispatchers.Default) {
+            runCatching { BackdropBlur.make(w.bitmap, settings.cardBlur).asImageBitmap() }.getOrNull()
+        }
+    }
     val backdrop = remember(backdropImage) { backdropImage?.let { Backdrop(it) } }
     SideEffect {
         backdrop?.rootSize = Size(size.width.toFloat(), size.height.toFloat())
@@ -274,7 +282,7 @@ fun LockScreenContent(
             .filter { !(settings.hideOngoing && it.ongoing) }
             .filter { !(secure && it.visibility == Notification.VISIBILITY_SECRET) }
             .map { n ->
-                if (secure && !settings.showContentWhenSecure) n.copy(title = n.appName, text = "Conteúdo oculto", bigText = "")
+                if (secure && !settings.showContentWhenSecure) n.copy(title = n.appName, text = if (isPt()) "Conteúdo oculto" else "Content hidden", bigText = "", picture = null, actions = emptyList(), hidden = true)
                 else n
             }
     }
@@ -415,6 +423,7 @@ fun LockScreenContent(
                         onOpen = onOpenNotification,
                         onDismiss = onDismissNotification,
                         onClearAll = onClearAll,
+                        onAction = onAction,
                         modifier = Modifier.fillMaxSize(),
                     )
                     // sem o acesso do sistema as notificações nunca chegam: mostra o motivo em vez de uma tela vazia
@@ -501,8 +510,8 @@ private fun GlanceInfo(w: WeatherUi, tint: Color, modifier: Modifier = Modifier)
     }
     val sh = Shadow(Color.Black.copy(alpha = 0.30f), Offset(0f, 2f), 10f)
     androidx.compose.foundation.layout.Column(modifier) {
-        Text(l1, style = TextStyle(fontFamily = lockFont(500), fontSize = 20.sp, color = tint, shadow = sh), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (l2 != null) Text(l2, style = TextStyle(fontFamily = lockFont(400), fontSize = 16.sp, color = tint.copy(alpha = 0.85f), shadow = sh))
+        Text(l1, style = TextStyle(fontFamily = DateFont, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 20.sp, color = tint, shadow = sh), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (l2 != null) Text(l2, style = TextStyle(fontFamily = DateFont, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 16.sp, color = tint.copy(alpha = 0.85f), shadow = sh))
     }
 }
 

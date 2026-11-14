@@ -1,7 +1,21 @@
 @file:OptIn(androidx.compose.ui.text.ExperimentalTextApi::class)
 package com.pixelexperience.forall.lockscreen.ui.clock
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.text.format.DateFormat
+import androidx.compose.animation.core.snap
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
@@ -18,7 +32,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AcUnit
 import androidx.compose.material.icons.rounded.Cloud
@@ -57,6 +70,7 @@ import androidx.compose.ui.unit.sp
 import com.pixelexperience.forall.lockscreen.R
 import com.pixelexperience.forall.lockscreen.data.ClockAlign
 import com.pixelexperience.forall.lockscreen.data.ClockStyle
+import com.pixelexperience.forall.lockscreen.ui.theme.DateFont
 import com.pixelexperience.forall.lockscreen.ui.theme.LockMotion
 import com.pixelexperience.forall.lockscreen.ui.theme.lockFont
 import kotlinx.coroutines.delay
@@ -81,16 +95,31 @@ fun LockClock(
     weather: WeatherUi? = null,
 ) {
     val ctx = LocalContext.current
-    val now by produceState(Date()) {
+    var now by remember { mutableStateOf(Date()) }
+    LaunchedEffect(Unit) {
         while (true) {
-            value = Date()
+            now = Date()
             delay(60_000L - System.currentTimeMillis() % 60_000L + 30L)
         }
+    }
+    // hora/fuso alterados ou tela religada: atualiza na hora, sem esperar o próximo minuto
+    DisposableEffect(ctx) {
+        val r = object : BroadcastReceiver() {
+            override fun onReceive(c: Context, i: Intent) { now = Date() }
+        }
+        val f = IntentFilter().apply {
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+            addAction(Intent.ACTION_TIME_TICK)
+        }
+        ContextCompat.registerReceiver(ctx, r, f, ContextCompat.RECEIVER_NOT_EXPORTED)
+        onDispose { runCatching { ctx.unregisterReceiver(r) } }
     }
     val cal = Calendar.getInstance().apply { time = now }
     val h = cal.get(Calendar.HOUR_OF_DAY)
     val is24 = DateFormat.is24HourFormat(ctx)
-    val hh = if (is24) "%02d".format(h) else (h % 12).let { if (it == 0) 12 else it }.toString()
+    val h12 = (h % 12).let { if (it == 0) 12 else it }
+    val hh = if (is24) "%02d".format(h) else "%02d".format(h12)
     val mm = "%02d".format(cal.get(Calendar.MINUTE))
     val date = remember(now) {
         val loc = Locale.getDefault()
@@ -102,7 +131,8 @@ fun LockClock(
     Column(modifier.fillMaxWidth(), horizontalAlignment = horizontal) {
         // data + clima logo abaixo do relógio
         val dateStyle = TextStyle(
-            fontFamily = lockFont(500),
+            fontFamily = DateFont,
+            fontWeight = FontWeight.Bold,
             fontSize = (20f * scale.coerceIn(0.9f, 1.3f)).sp,
             letterSpacing = 0.25.sp,
             color = tint.copy(alpha = 0.96f),
@@ -118,7 +148,7 @@ fun LockClock(
             contentAlignment = if (align == ClockAlign.START) Alignment.TopStart else Alignment.TopCenter,
             label = "clockStyle",
         ) { st -> ClockFace(st, hh, mm, scale, horizontal, tint, tint2) }
-        Row(Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(start = if (align == ClockAlign.START) 6.dp else 0.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(text = date, style = dateStyle)
             if (weather != null) {
                 Spacer(Modifier.width(10.dp))
@@ -182,7 +212,7 @@ private fun ClockFace(style: ClockStyle, hh: String, mm: String, scale: Float, h
 @Composable
 private fun Colon(sizeSp: Float, color: Color, scale: Float) {
     val s = sizeSp * scale
-    Canvas(Modifier.padding(horizontal = (s * 0.02f).dp).size(width = (s * 0.16f).dp, height = (s * 0.40f).dp)) {
+    Canvas(Modifier.padding(horizontal = (s * 0.03f).dp).size(width = (s * 0.14f).dp, height = (s * 0.36f).dp)) {
         val r = size.width / 2f
         val c = color.copy(alpha = 0.88f)
         drawCircle(c, r, Offset(size.width / 2f, size.height * 0.12f))
@@ -190,7 +220,11 @@ private fun Colon(sizeSp: Float, color: Color, scale: Float) {
     }
 }
 
-/** Cada dígito anima sozinho (só o que mudou gira), com mola expressiva. */
+/**
+ * Cada dígito ocupa um slot de largura fixa (a do maior algarismo da fonte), então trocar 1 -> 8 não
+ * empurra os vizinhos nem o ":" e o conjunto não "dança". Só o dígito que mudou anima, sem clip e sem
+ * animar tamanho.
+ */
 @Composable
 private fun Digits(
     text: String, sizeSp: Float, weight: Int, color: Color, scale: Float,
@@ -202,28 +236,38 @@ private fun Digits(
         fontFamily = family ?: lockFont(weight, width, 100f),
         fontSize = size,
         lineHeight = size * 0.86f,
-        letterSpacing = (-sizeSp * scale * 0.012f).sp,
+        letterSpacing = 0.sp,
         color = color,
         drawStyle = if (outline) Stroke(width = 4f) else null,
         shadow = if (depth && !outline) Shadow(Color.Black.copy(alpha = 0.26f), Offset(0f, 6f), 28f) else null,
         platformStyle = PlatformTextStyle(includeFontPadding = false),
         lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
+        fontFeatureSettings = "tnum",
     )
     // transição tonal contínua entre hora e minuto (azul -> lilás -> rosa no Dynamic Color)
     val style = if (colorEnd != null && !outline) base.copy(brush = Brush.verticalGradient(listOf(color, colorEnd)), alpha = 1f) else base
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    val slotW = remember(base) {
+        val px = "0123456789".maxOf { measurer.measure(it.toString(), base.copy(brush = null)).size.width }
+        with(density) { px.toDp() }
+    }
     Row {
         text.forEachIndexed { i, c ->
             key(i) {
-                AnimatedContent(
-                    targetState = c,
-                    transitionSpec = {
-                        (slideInVertically(animationSpec = LockMotion.spatial()) { it / 2 } +
-                            fadeIn(LockMotion.effects()) + scaleIn(LockMotion.spatial(), initialScale = 0.8f)) togetherWith
-                            (slideOutVertically(animationSpec = LockMotion.spatial()) { -it / 2 } +
-                                fadeOut(LockMotion.effects()) + scaleOut(LockMotion.effects(), targetScale = 0.8f))
-                    },
-                    label = "digit",
-                ) { ch -> Text(text = ch.toString(), style = style) }
+                Box(Modifier.width(slotW), contentAlignment = Alignment.Center) {
+                    AnimatedContent(
+                        targetState = c,
+                        transitionSpec = {
+                            (slideInVertically(animationSpec = LockMotion.spatial()) { it / 2 } +
+                                fadeIn(LockMotion.effects()) + scaleIn(LockMotion.spatial(), initialScale = 0.8f)) togetherWith
+                                (slideOutVertically(animationSpec = LockMotion.spatial()) { -it / 2 } +
+                                    fadeOut(LockMotion.effects()) + scaleOut(LockMotion.effects(), targetScale = 0.8f)) using
+                                SizeTransform(clip = false) { _, _ -> snap() }
+                        },
+                        label = "digit",
+                    ) { ch -> Text(text = ch.toString(), style = style, softWrap = false, maxLines = 1) }
+                }
             }
         }
     }

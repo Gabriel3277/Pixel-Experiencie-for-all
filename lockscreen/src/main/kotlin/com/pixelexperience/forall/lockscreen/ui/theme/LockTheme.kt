@@ -61,6 +61,9 @@ fun lockFont(weight: Int, width: Float = 100f, round: Float = 0f): FontFamily {
     }
 }
 
+/** Quicksand Bold: fonte da data e do clima na tela de bloqueio. */
+val DateFont = FontFamily(Font(R.font.quicksand_bold, FontWeight.Bold))
+
 private fun TextStyle.g(w: Int) = copy(fontFamily = lockFont(w))
 
 /** Hierarquia tipográfica única (Google Sans Flex) para todo o módulo. */
