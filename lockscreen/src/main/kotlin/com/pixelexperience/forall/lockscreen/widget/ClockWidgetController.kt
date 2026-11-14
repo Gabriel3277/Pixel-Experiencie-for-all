@@ -8,6 +8,7 @@ import android.appwidget.AppWidgetProviderInfo
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 
 /**
  * Hospeda widgets de terceiros via AppWidgetHost/AppWidgetManager (APIs oficiais do Android).
@@ -57,7 +58,27 @@ class ClockWidgetController private constructor(private val appContext: Context)
 
     /** Abre a configuração do widget (se tiver). O resultado chega em onActivityResult. */
     fun startConfigure(activity: Activity, id: Int, requestCode: Int) {
+        applySizeOptions(id)
         host.startAppWidgetConfigureActivityForResult(activity, id, 0, requestCode, null)
+    }
+
+    /** Launchers informam o tamanho ao widget antes da configuração; fazemos o mesmo. */
+    private fun applySizeOptions(id: Int) {
+        val info = manager.getAppWidgetInfo(id) ?: return
+        val d = appContext.resources.displayMetrics.density
+        var w = ClockWidgetStore.widthDp(appContext)
+        var h = ClockWidgetStore.heightDp(appContext)
+        if (w <= 0 || h <= 0) {
+            w = (info.minWidth / d).toInt().coerceAtLeast(1)
+            h = (info.minHeight / d).toInt().coerceAtLeast(1)
+        }
+        val o = Bundle().apply {
+            putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, w)
+            putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, h)
+            putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, w)
+            putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, h)
+        }
+        manager.updateAppWidgetOptions(id, o)
     }
 
     /** Confirma a escolha: apaga o widget anterior (substituição) e salva o novo. */
