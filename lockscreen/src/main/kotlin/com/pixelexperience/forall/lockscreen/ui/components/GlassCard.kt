@@ -30,6 +30,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
@@ -54,7 +56,7 @@ class Backdrop(val image: ImageBitmap) {
 
 val LocalBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 
-/** Card translúcido: desenha a fatia do papel de parede borrado que está atrás dele + tinta com opacidade. */
+/** Superfície tonal do Material 3: cor sólida do tema, sem blur do fundo e sem efeito de vidro. */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
@@ -63,38 +65,8 @@ fun GlassCard(
     opacity: Float,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val backdrop = LocalBackdrop.current
-    var pos by remember { mutableStateOf(Offset.Zero) }
     Box(
-        modifier
-            .clip(shape)
-            .onGloballyPositioned { pos = it.positionInRoot() }
-            .drawBehind {
-                val bd = backdrop
-                if (bd != null && bd.rootSize.width > 0f) {
-                    val bw = bd.image.width.toFloat()
-                    val bh = bd.image.height.toFloat()
-                    val sc = max(bd.rootSize.width / bw, bd.rootSize.height / bh)
-                    val ox = (bd.rootSize.width - bw * sc) / 2f
-                    val oy = (bd.rootSize.height - bh * sc) / 2f
-                    val local = (pos - bd.origin) / bd.coordScale
-                    withTransform({
-                        translate(ox - local.x, oy - local.y)
-                        scale(sc, sc, Offset.Zero)
-                    }) {
-                        drawImage(bd.image, filterQuality = FilterQuality.Medium)
-                    }
-                }
-                drawRect(tint.copy(alpha = opacity.coerceIn(0f, 1f)))
-                // realce tonal no topo: dá volume de superfície elevada (M3)
-                drawRect(
-                    Brush.verticalGradient(
-                        0f to Color.White.copy(alpha = 0.07f * opacity.coerceIn(0f, 1f) * 2f),
-                        0.5f to Color.Transparent,
-                    )
-                )
-            }
-            .border(0.8.dp, Color.White.copy(alpha = 0.12f), shape),
+        modifier.clip(shape).background(tint.copy(alpha = opacity.coerceIn(0f, 1f)), shape),
         content = content,
     )
 }
@@ -120,21 +92,21 @@ fun ShortcutButton(
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
     val sc by animateFloatAsState(if (pressed) 0.88f else 1f, LockMotion.fastSpatial(), label = "press")
-    val corner by animateFloatAsState(if (pressed) 28f else if (active) 38f else 50f, LockMotion.fastSpatial(), label = "corner")
-    val fill by animateColorAsState(if (active) accent else Color.Transparent, LockMotion.effects(), label = "fill")
+    val corner by animateFloatAsState(if (pressed) 18f else if (active) 24f else 32f, LockMotion.fastSpatial(), label = "corner")
+    val fill by animateColorAsState(if (active) accent else accent.copy(alpha = 0f), LockMotion.effects(), label = "fill")
     val iconTint by animateColorAsState(if (active) onAccent else iconColor, LockMotion.effects(), label = "iconTint")
     val iconScale by animateFloatAsState(if (active) 1.12f else 1f, LockMotion.bouncy(), label = "iconScale")
     val haptic = LocalHapticFeedback.current
-    val shape = RoundedCornerShape(percent = corner.roundToInt().coerceIn(0, 50))
+    val shape = RoundedCornerShape(corner.coerceAtLeast(0f).dp)
     GlassCard(
-        modifier = modifier.size(64.dp).graphicsLayer { scaleX = sc; scaleY = sc }.shadow(8.dp, shape, clip = false),
+        modifier = modifier.size(64.dp).graphicsLayer { scaleX = sc; scaleY = sc }.shadow(4.dp, shape, clip = false),
         shape = shape,
         tint = tint,
         opacity = opacity,
     ) {
         Box(
             Modifier.fillMaxSize().background(fill).clickable(
-                interactionSource = src, indication = ripple(color = Color.White), role = Role.Button, onClickLabel = description,
+                interactionSource = src, indication = ripple(color = iconTint), role = Role.Button, onClickLabel = description,
             ) {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 onClick()
@@ -145,7 +117,7 @@ fun ShortcutButton(
                 imageVector = icon,
                 contentDescription = description,
                 tint = iconTint,
-                modifier = Modifier.size(30.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale },
+                modifier = Modifier.size(28.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale },
             )
         }
     }

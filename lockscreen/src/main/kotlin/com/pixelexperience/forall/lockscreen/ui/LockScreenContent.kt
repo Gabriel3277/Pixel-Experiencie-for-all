@@ -255,11 +255,7 @@ fun LockScreenContent(
     }
 
     // vidro dos cards: miniatura borrada do wallpaper (recalcula só quando o nível de blur muda)
-    val backdropImage by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wallpaper, settings.cardBlur) {
-        value = wallpaper?.let { w ->
-            withContext(Dispatchers.Default) { BackdropBlur.make(w.bitmap, settings.cardBlur).asImageBitmap() }
-        }
-    }
+    val backdropImage by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null) { value = null }
     val backdrop = remember(backdropImage) { backdropImage?.let { Backdrop(it) } }
     SideEffect {
         backdrop?.rootSize = Size(size.width.toFloat(), size.height.toFloat())
@@ -358,21 +354,21 @@ fun LockScreenContent(
                 drawRect(
                     Brush.verticalGradient(
                         0f to Color.Black.copy(alpha = (d * 0.55f + 0.08f + 0.1f * p).coerceIn(0f, 1f)),
-                        0.35f to Color.Black.copy(alpha = (d * 0.18f + 0.05f * p).coerceIn(0f, 1f)),
-                        0.70f to Color.Black.copy(alpha = (d * 0.20f + 0.03f + 0.08f * p).coerceIn(0f, 1f)),
-                        1f to Color.Black.copy(alpha = (d * 0.55f + 0.08f + 0.1f * p).coerceIn(0f, 1f)),
+                        0.35f to Color.Black.copy(alpha = (d * 0.30f + 0.10f + 0.05f * p).coerceIn(0f, 1f)),
+                        0.70f to Color.Black.copy(alpha = (d * 0.16f + 0.02f + 0.08f * p).coerceIn(0f, 1f)),
+                        1f to Color.Black.copy(alpha = (d * 0.42f + 0.06f + 0.1f * p).coerceIn(0f, 1f)),
                     )
                 )
                 val cy = settings.clockY * h + 150.dp.toPx()
                 drawRect(
                     Brush.radialGradient(
-                        listOf(scheme.primary.copy(alpha = 0.17f * (1f - p)), Color.Transparent),
+                        listOf(Color.Black.copy(alpha = 0.12f * (1f - p)), Color.Transparent),
                         center = Offset(w / 2f, cy), radius = w * 0.95f,
                     )
                 )
                 drawRect(
                     Brush.radialGradient(
-                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.30f)),
+                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.12f)),
                         center = Offset(w / 2f, h * 0.45f), radius = h * 0.78f,
                     )
                 )
@@ -417,7 +413,7 @@ fun LockScreenContent(
                     modifier = Modifier.weight(1f).padding(horizontal = 12.dp).layerFx(e2::value, dragFn, 0.6f, 1.2f, distFn),
                 )
                 Row(
-                    Modifier.fillMaxWidth().padding(start = 36.dp, end = 36.dp, top = 20.dp, bottom = 32.dp)
+                    Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, top = 20.dp, bottom = 32.dp)
                         .layerFx(e3::value, dragFn, 1f, 1.6f, distFn),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
@@ -454,7 +450,7 @@ private fun ShortcutSlot(
             icon = type.icon(torchOn), description = type.label,
             active = type == ShortcutType.FLASHLIGHT && torchOn,
             accent = scheme.primary, onAccent = scheme.onPrimary,
-            tint = scheme.onPrimaryContainer, opacity = 0.94f, iconColor = scheme.primaryContainer,
+            tint = scheme.onPrimaryContainer, opacity = 1f, iconColor = scheme.primaryContainer,
             onClick = { onShortcut(type) },
         )
     }
