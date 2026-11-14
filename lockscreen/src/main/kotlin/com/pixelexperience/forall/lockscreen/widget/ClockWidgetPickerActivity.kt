@@ -205,7 +205,7 @@ class ClockWidgetPickerActivity : ComponentActivity() {
             REQ_BIND ->
                 if (resultCode == RESULT_OK) afterBind() else fail("Autorização negada.")
             REQ_CONFIGURE ->
-                if (resultCode == RESULT_OK) commitPending() else fail("Configuração cancelada.")
+                if (resultCode == RESULT_OK || controller.infoFor(pendingId) != null) commitPending() else fail("Configuração cancelada.")
         }
     }
 
