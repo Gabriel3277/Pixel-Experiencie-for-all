@@ -17,7 +17,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -53,8 +52,8 @@ fun lockFont(weight: Int, width: Float = 100f, round: Float = 0f): FontFamily {
     return fontCache.getOrPut("$w/$width/$round") {
         FontFamily(
             Font(
-                R.font.google_sans_flex, FontWeight(w), FontStyle.Normal,
-                FontVariation.Settings(
+                R.font.google_sans_flex, FontWeight(w),
+                variationSettings = FontVariation.Settings(
                     FontVariation.weight(w), FontVariation.width(width), FontVariation.Setting("ROND", round),
                 ),
             )
