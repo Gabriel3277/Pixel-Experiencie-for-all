@@ -96,6 +96,7 @@ class ClockWidgetPickerActivity : ComponentActivity() {
                     message = message,
                     onPick = ::onPick,
                     onRemove = ::onRemove,
+                    onConfigure = ::onConfigure,
                     onClose = { finish() },
                 )
             }
@@ -180,6 +181,20 @@ class ClockWidgetPickerActivity : ComponentActivity() {
         finish()
     }
 
+    private fun onConfigure() {
+        message = null
+        val id = controller.selectedId()
+        if (controller.infoFor(id)?.configure == null) {
+            message = "Este widget não tem configuração."
+            return
+        }
+        try {
+            controller.startConfigure(this, id, REQ_RECONFIG)
+        } catch (e: Exception) {
+            message = "Não foi possível abrir a configuração."
+        }
+    }
+
     private fun onRemove() {
         discardPending()
         controller.remove()
@@ -204,6 +219,7 @@ class ClockWidgetPickerActivity : ComponentActivity() {
         when (requestCode) {
             REQ_BIND ->
                 if (resultCode == RESULT_OK) afterBind() else fail("Autorização negada.")
+            REQ_RECONFIG -> refreshCurrent()
             REQ_CONFIGURE ->
                 if (resultCode == RESULT_OK || controller.infoFor(pendingId) != null) commitPending() else fail("Configuração cancelada.")
         }
@@ -212,6 +228,7 @@ class ClockWidgetPickerActivity : ComponentActivity() {
     private companion object {
         const val REQ_BIND = 7101
         const val REQ_CONFIGURE = 7102
+        const val REQ_RECONFIG = 7103
         const val KEY_PENDING_ID = "pending_id"
         const val KEY_PENDING_PROVIDER = "pending_provider"
     }
@@ -225,6 +242,7 @@ private fun PickerScreen(
     message: String?,
     onPick: (AppWidgetProviderInfo) -> Unit,
     onRemove: () -> Unit,
+    onConfigure: () -> Unit,
     onClose: () -> Unit,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
@@ -249,7 +267,10 @@ private fun PickerScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text("Atual: $currentLabel", style = MaterialTheme.typography.bodyMedium)
-                    TextButton(onClick = onRemove) { Text("Remover") }
+                    Row {
+                        TextButton(onClick = onConfigure) { Text("Configurar") }
+                        TextButton(onClick = onRemove) { Text("Remover") }
+                    }
                 }
             }
             if (message != null) {
