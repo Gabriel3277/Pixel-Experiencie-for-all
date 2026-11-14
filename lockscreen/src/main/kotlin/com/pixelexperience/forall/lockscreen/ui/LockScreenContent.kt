@@ -57,6 +57,22 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+import androidx.compose.material3.Text
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import com.pixelexperience.forall.lockscreen.data.WeatherUi
+import com.pixelexperience.forall.lockscreen.ui.theme.lockFont
+import java.util.Locale
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -107,7 +123,7 @@ import kotlin.math.roundToInt
 
 fun ShortcutType.icon(torchOn: Boolean): ImageVector = when (this) {
     ShortcutType.CAMERA -> Icons.Rounded.CameraAlt
-    ShortcutType.FLASHLIGHT -> if (torchOn) Icons.Rounded.FlashlightOn else Icons.Rounded.FlashlightOff
+    ShortcutType.FLASHLIGHT -> Icons.Rounded.FlashlightOn
     ShortcutType.DIALER -> Icons.Rounded.Call
     ShortcutType.ALARM -> Icons.Rounded.Alarm
     ShortcutType.ASSISTANT -> Icons.Rounded.Mic
@@ -313,7 +329,7 @@ fun LockScreenContent(
                                     val sc = 1.06f + 0.07f * p
                                     scaleX = sc
                                     scaleY = sc
-                                    val r = (blurDp * 1.4f + 18f + 22f * p).dp.toPx()
+                                    val r = (blurDp * 1.1f + 10f + 20f * p).dp.toPx()
                                     renderEffect = BlurEffect(r, r, TileMode.Clamp)
                                     compositingStrategy = CompositingStrategy.Offscreen
                                 }
@@ -343,8 +359,8 @@ fun LockScreenContent(
                     Brush.verticalGradient(
                         0f to Color.Black.copy(alpha = (d * 0.55f + 0.08f + 0.1f * p).coerceIn(0f, 1f)),
                         0.35f to Color.Black.copy(alpha = (d * 0.18f + 0.05f * p).coerceIn(0f, 1f)),
-                        0.70f to Color.Black.copy(alpha = (d * 0.35f + 0.05f + 0.08f * p).coerceIn(0f, 1f)),
-                        1f to Color.Black.copy(alpha = (d * 0.90f + 0.15f + 0.1f * p).coerceIn(0f, 1f)),
+                        0.70f to Color.Black.copy(alpha = (d * 0.20f + 0.03f + 0.08f * p).coerceIn(0f, 1f)),
+                        1f to Color.Black.copy(alpha = (d * 0.55f + 0.08f + 0.1f * p).coerceIn(0f, 1f)),
                     )
                 )
                 val cy = settings.clockY * h + 150.dp.toPx()
@@ -371,7 +387,17 @@ fun LockScreenContent(
             val animatedTop = animatedTopRaw.coerceAtLeast(0.dp) // a mola pode passar de 0 e gerar altura negativa
 
             Column(Modifier.fillMaxSize().then(insets)) {
-                Spacer(Modifier.height(animatedTop))
+                val gw = if (settings.showWeather) weather?.takeIf { it.tomorrowMax != null } else null
+                var glanceH by remember { mutableIntStateOf(0) }
+                if (gw != null) {
+                    GlanceInfo(
+                        gw, clockTint,
+                        Modifier.padding(start = 28.dp, end = 28.dp, top = 8.dp).onSizeChanged { glanceH = it.height }
+                            .layerFx(e1::value, dragFn, 0.25f, 1.4f, distFn),
+                    )
+                }
+                val glanceDp = if (gw != null) with(density) { glanceH.toDp() } else 0.dp
+                Spacer(Modifier.height((animatedTop - glanceDp).coerceAtLeast(if (gw != null) 16.dp else 0.dp)))
                 LockClock(
                     style = settings.clockStyle, scale = settings.clockScale, align = settings.clockAlign, tint = clockTint, tint2 = clockTint2,
                     weather = if (settings.showWeather) weather else null,
@@ -391,12 +417,25 @@ fun LockScreenContent(
                     modifier = Modifier.weight(1f).padding(horizontal = 12.dp).layerFx(e2::value, dragFn, 0.6f, 1.2f, distFn),
                 )
                 Row(
-                    Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, top = 20.dp, bottom = 32.dp)
+                    Modifier.fillMaxWidth().padding(start = 36.dp, end = 36.dp, top = 20.dp, bottom = 32.dp)
                         .layerFx(e3::value, dragFn, 1f, 1.6f, distFn),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     ShortcutSlot(settings.leftShortcut, torchOn, scheme, settings, onShortcut)
+                    Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
+                        val bat = rememberBatteryText()
+                        if (bat != null) {
+                            Text(
+                                bat, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                style = TextStyle(
+                                    fontFamily = lockFont(600), fontSize = 15.sp, letterSpacing = 0.1.sp,
+                                    color = Color.White.copy(alpha = 0.92f),
+                                    shadow = Shadow(Color.Black.copy(alpha = 0.35f), Offset(0f, 2f), 8f),
+                                ),
+                            )
+                        }
+                    }
                     ShortcutSlot(settings.rightShortcut, torchOn, scheme, settings, onShortcut)
                 }
             }
@@ -409,13 +448,68 @@ private fun ShortcutSlot(
     type: ShortcutType, torchOn: Boolean, scheme: ColorScheme, settings: LockSettings, onShortcut: (ShortcutType) -> Unit,
 ) {
     if (type == ShortcutType.NONE) {
-        Spacer(Modifier.size(60.dp))
+        Spacer(Modifier.size(64.dp))
     } else {
         ShortcutButton(
             icon = type.icon(torchOn), description = type.label,
             active = type == ShortcutType.FLASHLIGHT && torchOn,
-            accent = scheme.primary, onAccent = scheme.onPrimary, tint = scheme.surfaceContainerHighest,
-            opacity = settings.cardOpacity, onClick = { onShortcut(type) },
+            accent = scheme.primary, onAccent = scheme.onPrimary,
+            tint = scheme.onPrimaryContainer, opacity = 0.94f, iconColor = scheme.primaryContainer,
+            onClick = { onShortcut(type) },
         )
     }
+}
+
+private fun isPt() = Locale.getDefault().language == "pt"
+
+/** "At a Glance" do Pixel: previsão de amanhã e comparação com hoje (canto superior esquerdo). */
+@Composable
+private fun GlanceInfo(w: WeatherUi, tint: Color, modifier: Modifier = Modifier) {
+    val unit = if (w.fahrenheit) "°F" else "°C"
+    val tm = w.tomorrowMax ?: return
+    val pt = isPt()
+    val l1 = if (pt) "$tm$unit" + (w.city?.let { " em $it" } ?: "") + " amanhã"
+    else "$tm$unit" + (w.city?.let { " in $it" } ?: "") + " tomorrow"
+    val diff = w.todayMax?.let { tm - it }
+    val l2 = when {
+        diff == null -> null
+        diff == 0 -> if (pt) "Mesma temperatura de hoje" else "Same temperature as today"
+        diff > 0 -> if (pt) "$diff° mais quente que hoje" else "$diff° warmer than today"
+        else -> if (pt) "${-diff}° mais frio que hoje" else "${-diff}° cooler than today"
+    }
+    val sh = Shadow(Color.Black.copy(alpha = 0.30f), Offset(0f, 2f), 10f)
+    androidx.compose.foundation.layout.Column(modifier) {
+        Text(l1, style = TextStyle(fontFamily = lockFont(500), fontSize = 20.sp, color = tint, shadow = sh), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (l2 != null) Text(l2, style = TextStyle(fontFamily = lockFont(400), fontSize = 16.sp, color = tint.copy(alpha = 0.85f), shadow = sh))
+    }
+}
+
+/** Texto da bateria (como a linha central do Pixel): carregando / carregada / porcentagem. */
+@Composable
+private fun rememberBatteryText(): String? {
+    val ctx = LocalContext.current
+    var text by remember { mutableStateOf<String?>(null) }
+    DisposableEffect(ctx) {
+        val pt = isPt()
+        fun read(i: Intent?) {
+            if (i == null) return
+            val level = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = i.getIntExtra(BatteryManager.EXTRA_SCALE, 100).coerceAtLeast(1)
+            if (level < 0) return
+            val pct = level * 100 / scale
+            val plugged = i.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+            val full = i.getIntExtra(BatteryManager.EXTRA_STATUS, -1) == BatteryManager.BATTERY_STATUS_FULL
+            text = when {
+                full -> if (pt) "Carregada · 100%" else "Fully charged · 100%"
+                plugged -> if (pt) "Carregando · $pct%" else "Charging · $pct%"
+                else -> if (pt) "$pct% de bateria" else "$pct% battery"
+            }
+        }
+        val r = object : BroadcastReceiver() {
+            override fun onReceive(c: Context, i: Intent) = read(i)
+        }
+        read(ContextCompat.registerReceiver(ctx, r, IntentFilter(Intent.ACTION_BATTERY_CHANGED), ContextCompat.RECEIVER_NOT_EXPORTED))
+        onDispose { runCatching { ctx.unregisterReceiver(r) } }
+    }
+    return text
 }

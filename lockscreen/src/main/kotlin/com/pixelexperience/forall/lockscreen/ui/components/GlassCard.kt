@@ -24,6 +24,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -114,18 +115,20 @@ fun ShortcutButton(
     opacity: Float,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    iconColor: Color = Color.White,
 ) {
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
     val sc by animateFloatAsState(if (pressed) 0.88f else 1f, LockMotion.fastSpatial(), label = "press")
     val corner by animateFloatAsState(if (pressed) 28f else if (active) 38f else 50f, LockMotion.fastSpatial(), label = "corner")
     val fill by animateColorAsState(if (active) accent else Color.Transparent, LockMotion.effects(), label = "fill")
-    val iconTint by animateColorAsState(if (active) onAccent else Color.White, LockMotion.effects(), label = "iconTint")
+    val iconTint by animateColorAsState(if (active) onAccent else iconColor, LockMotion.effects(), label = "iconTint")
     val iconScale by animateFloatAsState(if (active) 1.12f else 1f, LockMotion.bouncy(), label = "iconScale")
     val haptic = LocalHapticFeedback.current
+    val shape = RoundedCornerShape(percent = corner.roundToInt().coerceIn(0, 50))
     GlassCard(
-        modifier = modifier.size(60.dp).graphicsLayer { scaleX = sc; scaleY = sc },
-        shape = RoundedCornerShape(percent = corner.roundToInt().coerceIn(0, 50)),
+        modifier = modifier.size(64.dp).graphicsLayer { scaleX = sc; scaleY = sc }.shadow(8.dp, shape, clip = false),
+        shape = shape,
         tint = tint,
         opacity = opacity,
     ) {
@@ -142,7 +145,7 @@ fun ShortcutButton(
                 imageVector = icon,
                 contentDescription = description,
                 tint = iconTint,
-                modifier = Modifier.size(26.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale },
+                modifier = Modifier.size(30.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale },
             )
         }
     }

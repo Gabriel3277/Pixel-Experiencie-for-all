@@ -97,23 +97,14 @@ fun LockClock(
     val horizontal = if (align == ClockAlign.START) Alignment.Start else Alignment.CenterHorizontally
 
     Column(modifier.fillMaxWidth(), horizontalAlignment = horizontal) {
-        // data acima do relógio, como no Pixel
+        // data + clima logo abaixo do relógio
         val dateStyle = TextStyle(
             fontFamily = lockFont(500),
-            fontSize = (18f * scale.coerceIn(0.9f, 1.3f)).sp,
+            fontSize = (20f * scale.coerceIn(0.9f, 1.3f)).sp,
             letterSpacing = 0.25.sp,
             color = tint.copy(alpha = 0.96f),
             shadow = Shadow(Color.Black.copy(alpha = 0.22f), Offset(0f, 2f), 10f),
         )
-        Row(Modifier.padding(start = 4.dp, end = 4.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(text = date, style = dateStyle)
-            if (weather != null) {
-                Text("  •  ", style = dateStyle.copy(color = tint.copy(alpha = 0.6f)))
-                Icon(weatherIcon(weather.code, weather.isDay), null, tint = tint, modifier = Modifier.size((20f * scale.coerceIn(0.9f, 1.3f)).dp))
-                Spacer(Modifier.width(4.dp))
-                Text("${weather.temp}°" + if (weather.fahrenheit) "F" else "", style = dateStyle)
-            }
-        }
         AnimatedContent(
             targetState = style,
             transitionSpec = {
@@ -124,6 +115,15 @@ fun LockClock(
             contentAlignment = if (align == ClockAlign.START) Alignment.TopStart else Alignment.TopCenter,
             label = "clockStyle",
         ) { st -> ClockFace(st, hh, mm, scale, horizontal, tint, tint2) }
+        Row(Modifier.padding(start = 4.dp, end = 4.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(text = date, style = dateStyle)
+            if (weather != null) {
+                Spacer(Modifier.width(10.dp))
+                Icon(weatherIcon(weather.code, weather.isDay), null, tint = tint, modifier = Modifier.size((22f * scale.coerceIn(0.9f, 1.3f)).dp))
+                Spacer(Modifier.width(4.dp))
+                Text("${weather.temp}°" + if (weather.fahrenheit) "F" else "", style = dateStyle)
+            }
+        }
     }
 }
 
