@@ -249,6 +249,10 @@ fun LockSettingsScreen(onBack: () -> Unit) {
                         onClick = { ctx.startActivity(android.content.Intent(ctx, com.pixelexperience.forall.lockscreen.widget.ClockWidgetPickerActivity::class.java)) },
                         shapes = ButtonDefaults.shapes(),
                     ) { Text("Escolher relógio de widget") }
+                    FilledTonalButton(
+                        onClick = { ctx.startActivity(android.content.Intent(ctx, com.pixelexperience.forall.lockscreen.widget.ClockWidgetResizeActivity::class.java)) },
+                        shapes = ButtonDefaults.shapes(),
+                    ) { Text("Redimensionar relógio de widget") }
                     ChipRow(ClockStyle.entries, s.clockStyle, { it.label }) { v -> set { it.copy(clockStyle = v) } }
                     ChipRow(ClockAlign.entries, s.clockAlign, { it.label }) { v -> set { it.copy(clockAlign = v) } }
                     ChipRow(ClockColor.entries, s.clockColor, { it.label }) { v -> set { it.copy(clockColor = v) } }

@@ -13,6 +13,8 @@ object ClockWidgetStore {
     private const val PREFS = "lockscreen_clock_widget"
     private const val KEY_ID = "app_widget_id"
     private const val KEY_PROVIDER = "provider"
+    private const val KEY_W = "width_dp"
+    private const val KEY_H = "height_dp"
 
     const val INVALID = AppWidgetManager.INVALID_APPWIDGET_ID
 
@@ -28,11 +30,20 @@ object ClockWidgetStore {
         prefs(context).edit()
             .putInt(KEY_ID, id)
             .putString(KEY_PROVIDER, provider.flattenToString())
+            .remove(KEY_W).remove(KEY_H)
             .apply()
     }
 
+    fun widthDp(context: Context): Int = prefs(context).getInt(KEY_W, 0)
+
+    fun heightDp(context: Context): Int = prefs(context).getInt(KEY_H, 0)
+
+    fun setSize(context: Context, w: Int, h: Int) {
+        prefs(context).edit().putInt(KEY_W, w).putInt(KEY_H, h).apply()
+    }
+
     fun clear(context: Context) {
-        prefs(context).edit().clear().apply()
+        prefs(context).edit().remove(KEY_ID).remove(KEY_PROVIDER).remove(KEY_W).remove(KEY_H).apply()
     }
 
     /** Observa mudanças. Retorna a função que cancela o registro. */

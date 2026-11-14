@@ -58,5 +58,6 @@
             </intent-filter>
         </receiver>
         <activity android:name="com.pixelexperience.forall.lockscreen.widget.ClockWidgetPickerActivity" android:exported="false" />
+    <activity android:name="com.pixelexperience.forall.lockscreen.widget.ClockWidgetResizeActivity" android:exported="false" />
 </application>
 </manifest>
