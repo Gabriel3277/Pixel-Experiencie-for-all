@@ -1,6 +1,25 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 package com.pixelexperience.forall.lockscreen.ui.settings
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.BlurOn
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Wallpaper
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ToggleButton
@@ -132,97 +151,131 @@ fun LockSettingsScreen(onBack: () -> Unit) {
         }
     }
 
+    var page by remember { mutableStateOf<String?>(null) }
+    BackHandler(enabled = page != null) { page = null }
+    val scroll = remember(page) { ScrollState(0) }
+
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack, shapes = IconButtonDefaults.shapes()) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar") }
-            Text("Tela de bloqueio Pixel", style = MaterialTheme.typography.titleLarge)
+            IconButton(onClick = { if (page != null) page = null else onBack() }, shapes = IconButtonDefaults.shapes()) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar")
+            }
+            Text(page ?: "Tela de bloqueio Pixel", style = MaterialTheme.typography.titleLarge)
         }
-        PhonePreview(s, wallpaper, demo)
         Column(
-            Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp).navigationBarsPadding(),
+            Modifier.weight(1f).verticalScroll(scroll).padding(16.dp).navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Section("Ativação") {
-                Text(
-                    "O Android não permite que apps troquem a tela de bloqueio do sistema. Esta tela aparece por cima dela " +
-                        "quando a tela liga; PIN, digital e rosto continuam sendo do Android.",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                PermissionRow("Exibir sobre outros apps", hasOverlay) {
-                    ctx.startActivity(LockScreenModule.overlaySettingsIntent(ctx))
+            if (page != "Ativação") PhonePreview(s, wallpaper, demo)
+            when (page) {
+                null -> {
+                    CatGroup(
+                        listOf(Cat(Icons.Filled.PowerSettingsNew, P_BLUE, "Ativação", if (s.enabled) "Ativada" else "Desativada · permissões", "Ativação")),
+                    ) { page = it }
+                    CatGroup(
+                        listOf(
+                            Cat(Icons.Filled.Wallpaper, P_PURPLE, "Papel de parede e cores", "Fundos prontos ou da galeria", "Papel de parede e cores"),
+                            Cat(Icons.Filled.Schedule, P_GREEN, "Relógio", s.clockStyle.label + " · " + s.clockAlign.label, "Relógio"),
+                            Cat(Icons.Filled.BlurOn, P_CYAN, "Blur do fundo", "Desfoque e escurecimento", "Blur do fundo"),
+                        ),
+                    ) { page = it }
+                    CatGroup(
+                        listOf(
+                            Cat(Icons.Filled.Notifications, P_ORANGE, "Notificações", "Cards, agrupamento e privacidade", "Notificações"),
+                            Cat(Icons.Filled.Apps, P_PINK, "Atalhos inferiores", s.leftShortcut.label + " · " + s.rightShortcut.label, "Atalhos inferiores"),
+                        ),
+                    ) { page = it }
                 }
-                PermissionRow("Acesso às notificações", hasListener) {
-                    ctx.startActivity(LockScreenModule.notificationAccessIntent())
-                }
-                SwitchRow("Ativar tela de bloqueio Pixel", s.enabled) { on ->
-                    if (on && !hasOverlay) {
+                "Ativação" -> {
+                Section("Ativação") {
+                    Text(
+                        "O Android não permite que apps troquem a tela de bloqueio do sistema. Esta tela aparece por cima dela " +
+                            "quando a tela liga; PIN, digital e rosto continuam sendo do Android.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    PermissionRow("Exibir sobre outros apps", hasOverlay) {
                         ctx.startActivity(LockScreenModule.overlaySettingsIntent(ctx))
-                    } else {
-                        if (on && Build.VERSION.SDK_INT >= 33 &&
-                            ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-                        ) postNotifPerm.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        set { it.copy(enabled = on) }
-                        LockScreenModule.sync(ctx)
+                    }
+                    PermissionRow("Acesso às notificações", hasListener) {
+                        ctx.startActivity(LockScreenModule.notificationAccessIntent())
+                    }
+                    SwitchRow("Ativar tela de bloqueio Pixel", s.enabled) { on ->
+                        if (on && !hasOverlay) {
+                            ctx.startActivity(LockScreenModule.overlaySettingsIntent(ctx))
+                        } else {
+                            if (on && Build.VERSION.SDK_INT >= 33 &&
+                                ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                            ) postNotifPerm.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            set { it.copy(enabled = on) }
+                            LockScreenModule.sync(ctx)
+                        }
                     }
                 }
-            }
-
-            Section("Papel de parede e cores") {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    BuiltInWallpapers.ids.forEach { id ->
-                        val thumb = remember(id) { BuiltInWallpapers.render(id, 90, 195).asImageBitmap() }
-                        val sel = s.wallpaperId == "builtin:$id"
-                        Image(
-                            thumb, BuiltInWallpapers.label(id), contentScale = ContentScale.Crop,
-                            modifier = Modifier.size(56.dp, 100.dp).clip(RoundedCornerShape(16.dp))
-                                .border(if (sel) BorderStroke(3.dp, MaterialTheme.colorScheme.primary) else BorderStroke(0.dp, Color.Transparent), RoundedCornerShape(16.dp))
-                                .clickable { set { it.copy(wallpaperId = "builtin:$id") } },
-                        )
-                    }
-                    Box(
-                        Modifier.size(56.dp, 100.dp).clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                            .border(if (s.wallpaperId == "custom") BorderStroke(3.dp, MaterialTheme.colorScheme.primary) else BorderStroke(0.dp, Color.Transparent), RoundedCornerShape(16.dp))
-                            .clickable { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                        contentAlignment = Alignment.Center,
-                    ) { Icon(Icons.Filled.AddPhotoAlternate, "Escolher da galeria") }
                 }
-                Text(
-                    "As cores do relógio e dos cards seguem o papel de parede escolhido.",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            Section("Relógio") {
-                ChipRow(ClockStyle.entries, s.clockStyle, { it.label }) { v -> set { it.copy(clockStyle = v) } }
-                ChipRow(ClockAlign.entries, s.clockAlign, { it.label }) { v -> set { it.copy(clockAlign = v) } }
-                ChipRow(ClockColor.entries, s.clockColor, { it.label }) { v -> set { it.copy(clockColor = v) } }
-                SliderRow("Tamanho", s.clockScale, 0.7f..1.4f, { "${(it * 100).roundToInt()}%" }) { v -> set { it.copy(clockScale = v) } }
-                SliderRow("Posição vertical", s.clockY, 0.02f..0.45f, { "${(it * 100).roundToInt()}%" }) { v -> set { it.copy(clockY = v) } }
-            }
-
-            Section("Blur do fundo") {
-                SliderRow("Desfoque", s.bgBlur, 0f..1f, { "${(it * 100).roundToInt()}%" }) { v -> set { it.copy(bgBlur = v) } }
-                SliderRow("Escurecimento", s.bgDim, 0f..0.7f, { "${(it * 100).roundToInt()}%" }) { v -> set { it.copy(bgDim = v) } }
-            }
-
-            Section("Notificações") {
-                SliderRow("Transparência dos cards", s.cardOpacity, 0.1f..0.9f, { "${(it * 100).roundToInt()}%" }) { v -> set { it.copy(cardOpacity = v) } }
-                SliderRow("Blur dos cards", s.cardBlur, 0f..1f, { "${(it * 100).roundToInt()}%" }) { v -> set { it.copy(cardBlur = v) } }
-                SwitchRow("Agrupar por app", s.groupNotifications) { v -> set { it.copy(groupNotifications = v) } }
-                SwitchRow("Ocultar notificações em andamento", s.hideOngoing) { v -> set { it.copy(hideOngoing = v) } }
-                SwitchRow("Mostrar conteúdo com bloqueio seguro", s.showContentWhenSecure) { v -> set { it.copy(showContentWhenSecure = v) } }
-                Text(
-                    "Desligado: com PIN/senha/digital configurados, o texto das notificações fica oculto até desbloquear.",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            Section("Atalhos inferiores") {
-                Text("Esquerda", style = MaterialTheme.typography.labelLarge)
-                ChipRow(ShortcutType.entries, s.leftShortcut, { it.label }) { v -> set { it.copy(leftShortcut = v) } }
-                Text("Direita", style = MaterialTheme.typography.labelLarge)
-                ChipRow(ShortcutType.entries, s.rightShortcut, { it.label }) { v -> set { it.copy(rightShortcut = v) } }
+                "Papel de parede e cores" -> {
+                Section("Papel de parede e cores") {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        BuiltInWallpapers.ids.forEach { id ->
+                            val thumb = remember(id) { BuiltInWallpapers.render(id, 90, 195).asImageBitmap() }
+                            val sel = s.wallpaperId == "builtin:$id"
+                            Image(
+                                thumb, BuiltInWallpapers.label(id), contentScale = ContentScale.Crop,
+                                modifier = Modifier.size(56.dp, 100.dp).clip(RoundedCornerShape(16.dp))
+                                    .border(if (sel) BorderStroke(3.dp, MaterialTheme.colorScheme.primary) else BorderStroke(0.dp, Color.Transparent), RoundedCornerShape(16.dp))
+                                    .clickable { set { it.copy(wallpaperId = "builtin:$id") } },
+                            )
+                        }
+                        Box(
+                            Modifier.size(56.dp, 100.dp).clip(RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                                .border(if (s.wallpaperId == "custom") BorderStroke(3.dp, MaterialTheme.colorScheme.primary) else BorderStroke(0.dp, Color.Transparent), RoundedCornerShape(16.dp))
+                                .clickable { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                            contentAlignment = Alignment.Center,
+                        ) { Icon(Icons.Filled.AddPhotoAlternate, "Escolher da galeria") }
+                    }
+                    Text(
+                        "As cores do relógio e dos cards seguem o papel de parede escolhido.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                }
+                "Relógio" -> {
+                Section("Relógio") {
+                    ChipRow(ClockStyle.entries, s.clockStyle, { it.label }) { v -> set { it.copy(clockStyle = v) } }
+                    ChipRow(ClockAlign.entries, s.clockAlign, { it.label }) { v -> set { it.copy(clockAlign = v) } }
+                    ChipRow(ClockColor.entries, s.clockColor, { it.label }) { v -> set { it.copy(clockColor = v) } }
+                    SliderRow("Tamanho", s.clockScale, 0.7f..1.4f, { "${(it * 100).roundToInt()}%" }) { v -> set { it.copy(clockScale = v) } }
+                    SliderRow("Posição vertical", s.clockY, 0.02f..0.45f, { "${(it * 100).roundToInt()}%" }) { v -> set { it.copy(clockY = v) } }
+                }
+                }
+                "Blur do fundo" -> {
+                Section("Blur do fundo") {
+                    SliderRow("Desfoque", s.bgBlur, 0f..1f, { "${(it * 100).roundToInt()}%" }) { v -> set { it.copy(bgBlur = v) } }
+                    SliderRow("Escurecimento", s.bgDim, 0f..0.7f, { "${(it * 100).roundToInt()}%" }) { v -> set { it.copy(bgDim = v) } }
+                }
+                }
+                "Notificações" -> {
+                Section("Notificações") {
+                    SliderRow("Transparência dos cards", s.cardOpacity, 0.1f..0.9f, { "${(it * 100).roundToInt()}%" }) { v -> set { it.copy(cardOpacity = v) } }
+                    SliderRow("Blur dos cards", s.cardBlur, 0f..1f, { "${(it * 100).roundToInt()}%" }) { v -> set { it.copy(cardBlur = v) } }
+                    SwitchRow("Agrupar por app", s.groupNotifications) { v -> set { it.copy(groupNotifications = v) } }
+                    SwitchRow("Ocultar notificações em andamento", s.hideOngoing) { v -> set { it.copy(hideOngoing = v) } }
+                    SwitchRow("Mostrar conteúdo com bloqueio seguro", s.showContentWhenSecure) { v -> set { it.copy(showContentWhenSecure = v) } }
+                    Text(
+                        "Desligado: com PIN/senha/digital configurados, o texto das notificações fica oculto até desbloquear.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                }
+                "Atalhos inferiores" -> {
+                Section("Atalhos inferiores") {
+                    Text("Esquerda", style = MaterialTheme.typography.labelLarge)
+                    ChipRow(ShortcutType.entries, s.leftShortcut, { it.label }) { v -> set { it.copy(leftShortcut = v) } }
+                    Text("Direita", style = MaterialTheme.typography.labelLarge)
+                    ChipRow(ShortcutType.entries, s.rightShortcut, { it.label }) { v -> set { it.copy(rightShortcut = v) } }
+                }
+                }
+                else -> Unit
             }
         }
     }
@@ -247,7 +300,7 @@ private fun PhonePreview(s: LockSettings, wallpaper: WallpaperUi?, demo: List<Lo
             ) {
                 LockScreenContent(
                     settings = s, wallpaper = wallpaper, notifications = demo, torchOn = false,
-                    preview = true, previewScale = scale,
+                    preview = true, previewScale = 1f,
                 )
             }
         }
@@ -304,6 +357,53 @@ private fun <T> ChipRow(options: List<T>, selected: T, label: (T) -> String, onS
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { o ->
             ToggleButton(checked = o == selected, onCheckedChange = { onSelect(o) }, shapes = ToggleButtonDefaults.shapes()) { Text(label(o)) }
+        }
+    }
+}
+
+
+private val P_BLUE = Color(0xFFB9D7FF)
+private val P_PURPLE = Color(0xFFE4C9F7)
+private val P_GREEN = Color(0xFFC5E8C9)
+private val P_CYAN = Color(0xFFB5E6F2)
+private val P_ORANGE = Color(0xFFFFE0A8)
+private val P_PINK = Color(0xFFF7C6DD)
+
+private class Cat(val icon: ImageVector, val color: Color, val title: String, val sub: String, val key: String)
+
+@Composable
+private fun CatGroup(items: List<Cat>, onOpen: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        items.forEachIndexed { i, c ->
+            val top = if (i == 0) 28.dp else 6.dp
+            val bottom = if (i == items.lastIndex) 28.dp else 6.dp
+            CategoryRow(c.icon, c.color, c.title, c.sub, RoundedCornerShape(top, top, bottom, bottom)) { onOpen(c.key) }
+        }
+    }
+}
+
+@Composable
+private fun CategoryRow(icon: ImageVector, iconBg: Color, title: String, subtitle: String, shape: Shape, onClick: () -> Unit) {
+    val src = remember { MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    val sc by animateFloatAsState(
+        if (pressed) 0.97f else 1f,
+        spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        label = "press",
+    )
+    Surface(
+        onClick = onClick, interactionSource = src, shape = shape, color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth().graphicsLayer { scaleX = sc; scaleY = sc },
+    ) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(48.dp).clip(CircleShape).background(iconBg), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = Color(0xFF1B1B1F), modifier = Modifier.size(24.dp))
+            }
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
