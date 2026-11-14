@@ -158,9 +158,9 @@ fun LockSettingsScreen(onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { if (page != null) page = null else onBack() }, shapes = IconButtonDefaults.shapes()) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar", tint = MaterialTheme.colorScheme.onSurface)
             }
-            Text(page ?: "Tela de bloqueio Pixel", style = MaterialTheme.typography.titleLarge)
+            Text(page ?: "Tela de bloqueio Pixel", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
         }
         Column(
             Modifier.weight(1f).verticalScroll(scroll).padding(16.dp).navigationBarsPadding(),
@@ -300,7 +300,7 @@ private fun PhonePreview(s: LockSettings, wallpaper: WallpaperUi?, demo: List<Lo
             ) {
                 LockScreenContent(
                     settings = s, wallpaper = wallpaper, notifications = demo, torchOn = false,
-                    preview = true, previewScale = 1f,
+                    preview = true, previewScale = scale,
                 )
             }
         }

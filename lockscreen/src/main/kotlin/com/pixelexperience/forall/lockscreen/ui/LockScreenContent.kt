@@ -259,7 +259,7 @@ fun LockScreenContent(
                         scaleX = sc
                         scaleY = sc
                         val r = (settings.bgBlur * 36f + 18f * p).dp.toPx()
-                        renderEffect = if (r > 0.5f) BlurEffect(r, r, TileMode.Clamp) else null
+                        renderEffect = if (!preview && r > 0.5f) BlurEffect(r, r, TileMode.Clamp) else null
                     },
                 )
             }
