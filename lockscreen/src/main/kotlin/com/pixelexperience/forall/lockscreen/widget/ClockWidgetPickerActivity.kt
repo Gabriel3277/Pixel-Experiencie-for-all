@@ -129,6 +129,10 @@ class ClockWidgetPickerActivity : ComponentActivity() {
 
     private fun refreshCurrent() {
         currentLabel = controller.selectedInfo()?.let { runCatching { it.loadLabel(packageManager) }.getOrNull() }
+        controller.selectedInfo()?.let { i ->
+            val feat = if (Build.VERSION.SDK_INT >= 28) i.widgetFeatures else -1
+            message = "cfg=${i.configure?.flattenToShortString()} resize=${i.resizeMode} feat=$feat min=${i.minWidth}x${i.minHeight}px"
+        }
     }
 
     private fun onPick(info: AppWidgetProviderInfo) {
