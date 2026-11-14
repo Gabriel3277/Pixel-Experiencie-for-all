@@ -16,6 +16,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pixelexperience.forall.lockscreen.data.LockSettingsRepository
@@ -32,8 +33,15 @@ import com.pixelexperience.forall.lockscreen.ui.theme.LockTheme
 class LockScreenActivity : ComponentActivity() {
 
     private val userPresent = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) { finishAndRemoveTask() }
+        override fun onReceive(context: Context, intent: Intent) {
+            // desbloqueio pela biometria nativa (digital lateral / rosto): anima a saída em vez de sumir de uma vez
+            if (isFinishing) return
+            unlockSignal.value = true
+            window.decorView.postDelayed({ if (!isFinishing) finishAndRemoveTask() }, 900)
+        }
     }
+
+    private val unlockSignal = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,6 +74,8 @@ class LockScreenActivity : ComponentActivity() {
                     wallpaper = wallpaper,
                     notifications = notifs,
                     torchOn = torch,
+                    unlockSignal = unlockSignal.value,
+                    onUnlockAnimated = { if (!isFinishing) finishAndRemoveTask() },
                     onShortcut = { runShortcut(it) },
                     onOpenNotification = { n ->
                         unlock(onSuccess = {

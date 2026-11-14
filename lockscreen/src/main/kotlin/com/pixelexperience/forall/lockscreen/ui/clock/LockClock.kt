@@ -13,9 +13,23 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AcUnit
+import androidx.compose.material.icons.rounded.Cloud
+import androidx.compose.material.icons.rounded.NightsStay
+import androidx.compose.material.icons.rounded.Thunderstorm
+import androidx.compose.material.icons.rounded.WaterDrop
+import androidx.compose.material.icons.rounded.WbCloudy
+import androidx.compose.material.icons.rounded.WbSunny
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.pixelexperience.forall.lockscreen.data.WeatherUi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -61,6 +75,7 @@ fun LockClock(
     tint: Color,
     modifier: Modifier = Modifier,
     tint2: Color = tint,
+    weather: WeatherUi? = null,
 ) {
     val ctx = LocalContext.current
     val now by produceState(Date()) {
@@ -83,17 +98,22 @@ fun LockClock(
 
     Column(modifier.fillMaxWidth(), horizontalAlignment = horizontal) {
         // data acima do relógio, como no Pixel
-        Text(
-            text = date,
-            modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 2.dp),
-            style = TextStyle(
-                fontFamily = lockFont(500),
-                fontSize = (18f * scale.coerceIn(0.9f, 1.3f)).sp,
-                letterSpacing = 0.25.sp,
-                color = tint.copy(alpha = 0.96f),
-                shadow = Shadow(Color.Black.copy(alpha = 0.22f), Offset(0f, 2f), 10f),
-            ),
+        val dateStyle = TextStyle(
+            fontFamily = lockFont(500),
+            fontSize = (18f * scale.coerceIn(0.9f, 1.3f)).sp,
+            letterSpacing = 0.25.sp,
+            color = tint.copy(alpha = 0.96f),
+            shadow = Shadow(Color.Black.copy(alpha = 0.22f), Offset(0f, 2f), 10f),
         )
+        Row(Modifier.padding(start = 4.dp, end = 4.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(text = date, style = dateStyle)
+            if (weather != null) {
+                Text("  •  ", style = dateStyle.copy(color = tint.copy(alpha = 0.6f)))
+                Icon(weatherIcon(weather.code, weather.isDay), null, tint = tint, modifier = Modifier.size((20f * scale.coerceIn(0.9f, 1.3f)).dp))
+                Spacer(Modifier.width(4.dp))
+                Text("${weather.temp}°" + if (weather.fahrenheit) "F" else "", style = dateStyle)
+            }
+        }
         AnimatedContent(
             targetState = style,
             transitionSpec = {
@@ -105,6 +125,16 @@ fun LockClock(
             label = "clockStyle",
         ) { st -> ClockFace(st, hh, mm, scale, horizontal, tint, tint2) }
     }
+}
+
+private fun weatherIcon(code: Int, day: Boolean): ImageVector = when (code) {
+    0 -> if (day) Icons.Rounded.WbSunny else Icons.Rounded.NightsStay
+    1, 2 -> if (day) Icons.Rounded.WbCloudy else Icons.Rounded.NightsStay
+    3, 45, 48 -> Icons.Rounded.Cloud
+    in 51..67, in 80..82 -> Icons.Rounded.WaterDrop
+    in 71..77, 85, 86 -> Icons.Rounded.AcUnit
+    in 95..99 -> Icons.Rounded.Thunderstorm
+    else -> Icons.Rounded.Cloud
 }
 
 @Composable

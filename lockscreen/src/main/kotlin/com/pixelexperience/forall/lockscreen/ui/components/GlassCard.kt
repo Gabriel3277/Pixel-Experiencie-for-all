@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ripple
+import androidx.compose.ui.semantics.Role
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -97,8 +99,9 @@ fun GlassCard(
 }
 
 /**
- * Atalho estilo Pixel / M3 Expressive: forma que "morfa" por mola (squircle -> círculo quando ativo, mais quadrada ao pressionar),
- * container tonal translúcido, preenchimento Dynamic Color ao ativar e haptic.
+ * Atalho inferior estilo Pixel (60dp) com M3 Expressive em todos os estados:
+ * repouso = círculo translúcido; pressionado = forma "morfa" para squircle + escala por mola + ripple recortado;
+ * ativo (ex.: lanterna ligada) = squircle preenchido com a cor primária dinâmica e ícone com mola.
  */
 @Composable
 fun ShortcutButton(
@@ -114,29 +117,33 @@ fun ShortcutButton(
 ) {
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
-    val sc by animateFloatAsState(if (pressed) 0.90f else 1f, LockMotion.fastSpatial(), label = "press")
-    val corner by animateFloatAsState(if (pressed) 22f else if (active) 50f else 34f, LockMotion.fastSpatial(), label = "corner")
+    val sc by animateFloatAsState(if (pressed) 0.88f else 1f, LockMotion.fastSpatial(), label = "press")
+    val corner by animateFloatAsState(if (pressed) 28f else if (active) 38f else 50f, LockMotion.fastSpatial(), label = "corner")
     val fill by animateColorAsState(if (active) accent else Color.Transparent, LockMotion.effects(), label = "fill")
     val iconTint by animateColorAsState(if (active) onAccent else Color.White, LockMotion.effects(), label = "iconTint")
+    val iconScale by animateFloatAsState(if (active) 1.12f else 1f, LockMotion.bouncy(), label = "iconScale")
     val haptic = LocalHapticFeedback.current
     GlassCard(
-        modifier = modifier
-            .size(64.dp)
-            .graphicsLayer { scaleX = sc; scaleY = sc }
-            .clickable(interactionSource = src, indication = null) {
-                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                onClick()
-            },
+        modifier = modifier.size(60.dp).graphicsLayer { scaleX = sc; scaleY = sc },
         shape = RoundedCornerShape(percent = corner.roundToInt().coerceIn(0, 50)),
         tint = tint,
         opacity = opacity,
     ) {
-        Box(Modifier.fillMaxSize().background(fill))
-        Icon(
-            imageVector = icon,
-            contentDescription = description,
-            tint = iconTint,
-            modifier = Modifier.align(Alignment.Center).size(28.dp),
-        )
+        Box(
+            Modifier.fillMaxSize().background(fill).clickable(
+                interactionSource = src, indication = ripple(color = Color.White), role = Role.Button, onClickLabel = description,
+            ) {
+                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onClick()
+            },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = description,
+                tint = iconTint,
+                modifier = Modifier.size(26.dp).graphicsLayer { scaleX = iconScale; scaleY = iconScale },
+            )
+        }
     }
 }

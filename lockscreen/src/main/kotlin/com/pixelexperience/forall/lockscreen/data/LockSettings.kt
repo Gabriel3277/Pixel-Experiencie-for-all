@@ -50,6 +50,7 @@ data class LockSettings(
     val showContentWhenSecure: Boolean = false,
     val leftShortcut: ShortcutType = ShortcutType.FLASHLIGHT,
     val rightShortcut: ShortcutType = ShortcutType.CAMERA,
+    val showWeather: Boolean = true,
 )
 
 private val Context.lockStore by preferencesDataStore("pxe_lockscreen")
@@ -72,6 +73,7 @@ private object K {
     val showSecure = booleanPreferencesKey("show_secure")
     val left = stringPreferencesKey("left_shortcut")
     val right = stringPreferencesKey("right_shortcut")
+    val weather = booleanPreferencesKey("show_weather")
 }
 
 private inline fun <reified E : Enum<E>> Preferences.enumOf(key: Preferences.Key<String>, def: E): E {
@@ -99,6 +101,7 @@ private fun Preferences.toSettings(): LockSettings {
         showContentWhenSecure = this[K.showSecure] ?: d.showContentWhenSecure,
         leftShortcut = enumOf(K.left, d.leftShortcut),
         rightShortcut = enumOf(K.right, d.rightShortcut),
+        showWeather = this[K.weather] ?: d.showWeather,
     )
 }
 
@@ -120,6 +123,7 @@ private fun MutablePreferences.write(s: LockSettings) {
     this[K.showSecure] = s.showContentWhenSecure
     this[K.left] = s.leftShortcut.name
     this[K.right] = s.rightShortcut.name
+    this[K.weather] = s.showWeather
 }
 
 /** Fonte única das configurações: estado em memória (instantâneo) + persistência em DataStore (com debounce). */

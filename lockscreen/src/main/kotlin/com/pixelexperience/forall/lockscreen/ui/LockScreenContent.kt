@@ -33,12 +33,12 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Alarm
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.FlashlightOff
-import androidx.compose.material.icons.filled.FlashlightOn
-import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.rounded.Alarm
+import androidx.compose.material.icons.rounded.Call
+import androidx.compose.material.icons.rounded.CameraAlt
+import androidx.compose.material.icons.rounded.FlashlightOff
+import androidx.compose.material.icons.rounded.FlashlightOn
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -57,7 +57,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.draw.drawWithContent
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.pixelexperience.forall.lockscreen.data.WeatherRepository
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TileMode
@@ -101,12 +106,12 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 fun ShortcutType.icon(torchOn: Boolean): ImageVector = when (this) {
-    ShortcutType.CAMERA -> Icons.Filled.CameraAlt
-    ShortcutType.FLASHLIGHT -> if (torchOn) Icons.Filled.FlashlightOn else Icons.Filled.FlashlightOff
-    ShortcutType.DIALER -> Icons.Filled.Call
-    ShortcutType.ALARM -> Icons.Filled.Alarm
-    ShortcutType.ASSISTANT -> Icons.Filled.Mic
-    ShortcutType.NONE -> Icons.Filled.Call
+    ShortcutType.CAMERA -> Icons.Rounded.CameraAlt
+    ShortcutType.FLASHLIGHT -> if (torchOn) Icons.Rounded.FlashlightOn else Icons.Rounded.FlashlightOff
+    ShortcutType.DIALER -> Icons.Rounded.Call
+    ShortcutType.ALARM -> Icons.Rounded.Alarm
+    ShortcutType.ASSISTANT -> Icons.Rounded.Mic
+    ShortcutType.NONE -> Icons.Rounded.Call
 }
 
 @Composable
@@ -141,6 +146,8 @@ fun LockScreenContent(
     notifications: List<LockNotification>,
     torchOn: Boolean,
     modifier: Modifier = Modifier,
+    unlockSignal: Boolean = false,
+    onUnlockAnimated: () -> Unit = {},
     preview: Boolean = false,
     previewScale: Float = 1f,
     onShortcut: (ShortcutType) -> Unit = {},
@@ -171,6 +178,16 @@ fun LockScreenContent(
     val requestUnlock by rememberUpdatedState(onRequestUnlock)
     // evita pedir o desbloqueio duas vezes (onDragStopped + onPostFling disparam juntos)
     var unlocking by remember { mutableStateOf(false) }
+    val weather by WeatherRepository.state.collectAsStateWithLifecycle()
+    LaunchedEffect(settings.showWeather) { if (settings.showWeather) WeatherRepository.refresh(ctx) }
+    // desbloqueio por biometria nativa: o conteúdo sobe e some com a mesma mola do gesto
+    LaunchedEffect(unlockSignal) {
+        if (unlockSignal && !preview) {
+            unlocking = true
+            drag.animateTo(-(size.height * 0.30f).coerceAtLeast(1f) * 1.2f, LockMotion.spatial())
+            onUnlockAnimated()
+        }
+    }
 
     suspend fun settle(vy: Float) {
         if (preview || unlocking) return
@@ -272,17 +289,47 @@ fun LockScreenContent(
         // 1) wallpaper: blur configurável + profundidade (escala e blur crescem ao arrastar)
         Crossfade(targetState = wallpaper, animationSpec = tween(500), label = "wp") { w ->
             if (w != null) {
-                Image(
-                    bitmap = w.image, contentDescription = null, contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().graphicsLayer {
-                        val p = (-drag.value / unlockDist).coerceIn(0f, 1f)
-                        val sc = 1.06f + 0.07f * p
-                        scaleX = sc
-                        scaleY = sc
-                        val r = (settings.bgBlur * 36f + 18f * p).dp.toPx()
-                        renderEffect = if (!preview && r > 0.5f) BlurEffect(r, r, TileMode.Clamp) else null
-                    },
-                )
+                val blurDp = settings.bgBlur * 36f
+                Box(Modifier.fillMaxSize()) {
+                    // camada 1: wallpaper com blur leve + profundidade (escala cresce ao arrastar)
+                    Image(
+                        bitmap = w.image, contentDescription = null, contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().graphicsLayer {
+                            val p = (-drag.value / unlockDist).coerceIn(0f, 1f)
+                            val sc = 1.06f + 0.07f * p
+                            scaleX = sc
+                            scaleY = sc
+                            val r = (blurDp * 0.35f + 14f * p).dp.toPx()
+                            renderEffect = if (!preview && r > 0.5f) BlurEffect(r, r, TileMode.Clamp) else null
+                        },
+                    )
+                    // camada 2: blur forte com máscara progressiva (transparente no topo -> opaco embaixo, onde ficam os cards)
+                    if (!preview && blurDp > 1f) {
+                        Image(
+                            bitmap = w.image, contentDescription = null, contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                                .graphicsLayer {
+                                    val p = (-drag.value / unlockDist).coerceIn(0f, 1f)
+                                    val sc = 1.06f + 0.07f * p
+                                    scaleX = sc
+                                    scaleY = sc
+                                    val r = (blurDp * 1.4f + 18f + 22f * p).dp.toPx()
+                                    renderEffect = BlurEffect(r, r, TileMode.Clamp)
+                                    compositingStrategy = CompositingStrategy.Offscreen
+                                }
+                                .drawWithContent {
+                                    drawContent()
+                                    drawRect(
+                                        Brush.verticalGradient(
+                                            0f to Color.Transparent, 0.32f to Color.Transparent,
+                                            0.70f to Color.Black.copy(alpha = 0.85f), 1f to Color.Black,
+                                        ),
+                                        blendMode = BlendMode.DstIn,
+                                    )
+                                },
+                        )
+                    }
+                }
             }
         }
         // 2) scrim + integração com o relógio: gradiente de legibilidade, brilho tonal atrás dos números e vinheta
@@ -327,6 +374,7 @@ fun LockScreenContent(
                 Spacer(Modifier.height(animatedTop))
                 LockClock(
                     style = settings.clockStyle, scale = settings.clockScale, align = settings.clockAlign, tint = clockTint, tint2 = clockTint2,
+                    weather = if (settings.showWeather) weather else null,
                     modifier = Modifier.padding(horizontal = 28.dp).layerFx(e1::value, dragFn, 0.35f, 1.4f, distFn),
                 )
                 Spacer(Modifier.height(16.dp))
@@ -343,7 +391,7 @@ fun LockScreenContent(
                     modifier = Modifier.weight(1f).padding(horizontal = 12.dp).layerFx(e2::value, dragFn, 0.6f, 1.2f, distFn),
                 )
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 40.dp, vertical = 26.dp)
+                    Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, top = 20.dp, bottom = 32.dp)
                         .layerFx(e3::value, dragFn, 1f, 1.6f, distFn),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
@@ -361,7 +409,7 @@ private fun ShortcutSlot(
     type: ShortcutType, torchOn: Boolean, scheme: ColorScheme, settings: LockSettings, onShortcut: (ShortcutType) -> Unit,
 ) {
     if (type == ShortcutType.NONE) {
-        Spacer(Modifier.size(64.dp))
+        Spacer(Modifier.size(60.dp))
     } else {
         ShortcutButton(
             icon = type.icon(torchOn), description = type.label,

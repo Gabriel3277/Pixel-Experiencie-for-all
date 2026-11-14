@@ -143,6 +143,9 @@ fun LockSettingsScreen(onBack: () -> Unit) {
     fun set(block: (LockSettings) -> LockSettings) = repo.update(block)
 
     val postNotifPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    val locPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        scope.launch { com.pixelexperience.forall.lockscreen.data.WeatherRepository.refresh(ctx, force = true) }
+    }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) scope.launch {
             if (WallpaperRepository.saveCustom(ctx, uri)) {
@@ -246,6 +249,16 @@ fun LockSettingsScreen(onBack: () -> Unit) {
                     ChipRow(ClockColor.entries, s.clockColor, { it.label }) { v -> set { it.copy(clockColor = v) } }
                     SliderRow("Tamanho", s.clockScale, 0.7f..1.4f, { "${(it * 100).roundToInt()}%" }) { v -> set { it.copy(clockScale = v) } }
                     SliderRow("Posição vertical", s.clockY, 0.02f..0.45f, { "${(it * 100).roundToInt()}%" }) { v -> set { it.copy(clockY = v) } }
+                    SwitchRow("Mostrar clima ao lado da data", s.showWeather) { on ->
+                        if (on && ContextCompat.checkSelfPermission(ctx, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                            locPerm.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                        }
+                        set { it.copy(showWeather = on) }
+                    }
+                    Text(
+                        "Usa sua localização aproximada (última conhecida) e a Open-Meteo, sem chave nem conta. Só as coordenadas aproximadas são enviadas.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 }
                 "Blur do fundo" -> {

@@ -26,14 +26,23 @@ object TorchController {
         if (registered) return
         runCatching {
             val cm = ctx.getSystemService(CameraManager::class.java)
-            camId = cm.cameraIdList.firstOrNull { id ->
+            resolveId(ctx)
+            cm.registerTorchCallback(callback, Handler(Looper.getMainLooper()))
+            registered = true
+        }
+    }
+
+    private fun resolveId(ctx: Context): String? {
+        camId?.let { return it }
+        val cm = ctx.getSystemService(CameraManager::class.java)
+        camId = runCatching {
+            cm.cameraIdList.firstOrNull { id ->
                 val c = cm.getCameraCharacteristics(id)
                 c.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true &&
                     c.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK
             }
-            cm.registerTorchCallback(callback, Handler(Looper.getMainLooper()))
-            registered = true
-        }
+        }.getOrNull()
+        return camId
     }
 
     fun unregister(ctx: Context) {
@@ -43,7 +52,7 @@ object TorchController {
     }
 
     fun toggle(ctx: Context): Boolean {
-        val id = camId ?: return false
+        val id = camId ?: resolveId(ctx) ?: return false
         return runCatching {
             ctx.getSystemService(CameraManager::class.java).setTorchMode(id, !_on.value)
             true
