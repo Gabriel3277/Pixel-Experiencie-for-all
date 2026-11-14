@@ -109,6 +109,7 @@ import com.pixelexperience.forall.lockscreen.data.WallpaperUi
 import com.pixelexperience.forall.lockscreen.notifications.LockAction
 import com.pixelexperience.forall.lockscreen.notifications.LockNotification
 import com.pixelexperience.forall.lockscreen.ui.clock.LockClock
+import com.pixelexperience.forall.lockscreen.widget.HostedClockWidget
 import com.pixelexperience.forall.lockscreen.ui.components.Backdrop
 import com.pixelexperience.forall.lockscreen.ui.components.GlassCard
 import com.pixelexperience.forall.lockscreen.ui.components.LocalBackdrop
@@ -406,10 +407,15 @@ fun LockScreenContent(
                 }
                 val glanceDp = if (gw != null) with(density) { glanceH.toDp() } else 0.dp
                 Spacer(Modifier.height((animatedTop - glanceDp).coerceAtLeast(if (gw != null) 16.dp else 0.dp)))
-                LockClock(
-                    style = settings.clockStyle, scale = settings.clockScale, align = settings.clockAlign, tint = clockTint, tint2 = clockTint2,
-                    weather = if (settings.showWeather) weather else null,
-                    modifier = Modifier.padding(horizontal = 28.dp).layerFx(e1::value, dragFn, 0.35f, 1.4f, distFn),
+                HostedClockWidget(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp).layerFx(e1::value, dragFn, 0.35f, 1.4f, distFn),
+                    fallback = {
+                        LockClock(
+                            style = settings.clockStyle, scale = settings.clockScale, align = settings.clockAlign, tint = clockTint, tint2 = clockTint2,
+                            weather = if (settings.showWeather) weather else null,
+                            modifier = Modifier.padding(horizontal = 28.dp).layerFx(e1::value, dragFn, 0.35f, 1.4f, distFn),
+                        )
+                    },
                 )
                 Spacer(Modifier.height(16.dp))
                 Box(Modifier.weight(1f).padding(horizontal = 12.dp).layerFx(e2::value, dragFn, 0.6f, 1.2f, distFn)) {
