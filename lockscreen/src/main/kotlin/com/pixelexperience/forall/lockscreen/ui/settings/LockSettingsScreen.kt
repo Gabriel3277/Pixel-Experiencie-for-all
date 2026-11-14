@@ -200,7 +200,8 @@ fun LockSettingsScreen(onBack: () -> Unit) {
                         ctx.startActivity(LockScreenModule.overlaySettingsIntent(ctx))
                     }
                     PermissionRow("Acesso às notificações", hasListener) {
-                        ctx.startActivity(LockScreenModule.notificationAccessIntent())
+                        runCatching { ctx.startActivity(LockScreenModule.notificationAccessIntent(ctx)) }
+                            .onFailure { ctx.startActivity(LockScreenModule.notificationAccessIntent()) }
                     }
                     SwitchRow("Ativar tela de bloqueio Pixel", s.enabled) { on ->
                         if (on && !hasOverlay) {

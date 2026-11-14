@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.pixelexperience.forall.lockscreen.LockScreenModule
 import com.pixelexperience.forall.lockscreen.data.LockSettingsRepository
 import com.pixelexperience.forall.lockscreen.data.ShortcutType
 import com.pixelexperience.forall.lockscreen.notifications.LockNotificationListener
@@ -42,6 +43,7 @@ class LockScreenActivity : ComponentActivity() {
     }
 
     private val unlockSignal = mutableStateOf(false)
+    private val notifAccess = mutableStateOf(true)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,6 +76,8 @@ class LockScreenActivity : ComponentActivity() {
                     wallpaper = wallpaper,
                     notifications = notifs,
                     torchOn = torch,
+                    notificationAccess = notifAccess.value,
+                    onGrantNotificationAccess = { launchAfterUnlock(LockScreenModule.notificationAccessIntent(this@LockScreenActivity)) },
                     unlockSignal = unlockSignal.value,
                     onUnlockAnimated = { if (!isFinishing) finishAndRemoveTask() },
                     onShortcut = { runShortcut(it) },
@@ -96,6 +100,12 @@ class LockScreenActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        notifAccess.value = LockScreenModule.hasNotificationAccess(this)
+        LockScreenModule.ensureNotificationListener(this)
     }
 
     private var unlockPending = false

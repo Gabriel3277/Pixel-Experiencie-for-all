@@ -14,6 +14,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -108,6 +109,7 @@ import com.pixelexperience.forall.lockscreen.data.WallpaperUi
 import com.pixelexperience.forall.lockscreen.notifications.LockNotification
 import com.pixelexperience.forall.lockscreen.ui.clock.LockClock
 import com.pixelexperience.forall.lockscreen.ui.components.Backdrop
+import com.pixelexperience.forall.lockscreen.ui.components.GlassCard
 import com.pixelexperience.forall.lockscreen.ui.components.LocalBackdrop
 import com.pixelexperience.forall.lockscreen.ui.components.ShortcutButton
 import androidx.compose.material3.ColorScheme
@@ -162,6 +164,8 @@ fun LockScreenContent(
     notifications: List<LockNotification>,
     torchOn: Boolean,
     modifier: Modifier = Modifier,
+    notificationAccess: Boolean = true,
+    onGrantNotificationAccess: () -> Unit = {},
     unlockSignal: Boolean = false,
     onUnlockAnimated: () -> Unit = {},
     preview: Boolean = false,
@@ -400,18 +404,40 @@ fun LockScreenContent(
                     modifier = Modifier.padding(horizontal = 28.dp).layerFx(e1::value, dragFn, 0.35f, 1.4f, distFn),
                 )
                 Spacer(Modifier.height(16.dp))
-                NotificationsList(
-                    items = shown,
-                    grouped = settings.groupNotifications,
-                    opacity = settings.cardOpacity,
-                    tint = scheme.surfaceContainerHigh,
-                    accent = scheme.primary,
-                    preview = preview,
-                    onOpen = onOpenNotification,
-                    onDismiss = onDismissNotification,
-                    onClearAll = onClearAll,
-                    modifier = Modifier.weight(1f).padding(horizontal = 12.dp).layerFx(e2::value, dragFn, 0.6f, 1.2f, distFn),
-                )
+                Box(Modifier.weight(1f).padding(horizontal = 12.dp).layerFx(e2::value, dragFn, 0.6f, 1.2f, distFn)) {
+                    NotificationsList(
+                        items = shown,
+                        grouped = settings.groupNotifications,
+                        opacity = settings.cardOpacity,
+                        tint = scheme.surfaceContainerHigh,
+                        accent = scheme.primary,
+                        preview = preview,
+                        onOpen = onOpenNotification,
+                        onDismiss = onDismissNotification,
+                        onClearAll = onClearAll,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    // sem o acesso do sistema as notificações nunca chegam: mostra o motivo em vez de uma tela vazia
+                    if (!preview && !notificationAccess) {
+                        GlassCard(
+                            modifier = Modifier.fillMaxWidth().clickable { onGrantNotificationAccess() },
+                            shape = RoundedCornerShape(32.dp),
+                            tint = scheme.surfaceContainerHigh,
+                            opacity = settings.cardOpacity.coerceAtLeast(0.7f),
+                        ) {
+                            Column(Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
+                                Text(
+                                    "Notificações desativadas", color = Color.White,
+                                    style = TextStyle(fontFamily = lockFont(600), fontSize = 15.sp),
+                                )
+                                Text(
+                                    "Toque para liberar o acesso às notificações", color = Color.White.copy(alpha = 0.78f),
+                                    style = TextStyle(fontFamily = lockFont(400), fontSize = 14.sp),
+                                )
+                            }
+                        }
+                    }
+                }
                 Row(
                     Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, top = 20.dp, bottom = 32.dp)
                         .layerFx(e3::value, dragFn, 1f, 1.6f, distFn),

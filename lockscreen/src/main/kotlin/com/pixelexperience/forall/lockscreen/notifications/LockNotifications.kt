@@ -49,20 +49,37 @@ class LockNotificationListener : NotificationListenerService() {
     override fun onNotificationRemoved(sbn: StatusBarNotification?) = refresh()
 
     private fun refresh() {
-        val list = runCatching { activeNotifications }.getOrNull().orEmpty()
-            .mapNotNull { convert(it) }
+        val all = runCatching { activeNotifications }.getOrNull().orEmpty()
+        // o resumo de grupo só entra quando o app não postou as notificações filhas (senão duplicaria)
+        val withChildren = all.filter { !it.isSummary() }.map { it.packageName to it.groupKey }.toSet()
+        val list = all
+            .filter { !it.isSummary() || (it.packageName to it.groupKey) !in withChildren }
+            .mapNotNull { sbn -> runCatching { convert(sbn) }.getOrNull() }
             .sortedByDescending { it.postTime }
         LockNotificationRepository.items.value = list
     }
 
+    private fun StatusBarNotification.isSummary() = (notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0
+
+    /** Texto da última mensagem de notificações MessagingStyle (WhatsApp, Telegram...), que muitas vezes não têm EXTRA_TEXT. */
+    @Suppress("DEPRECATION")
+    private fun lastMessageText(ex: android.os.Bundle): String? =
+        ex.getParcelableArray(Notification.EXTRA_MESSAGES)?.lastOrNull()
+            ?.let { (it as? android.os.Bundle)?.getCharSequence("text")?.toString() }
+            ?.takeIf { it.isNotBlank() }
+
     private fun convert(sbn: StatusBarNotification): LockNotification? {
         val n = sbn.notification
-        if ((n.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return null
         if (n.category == Notification.CATEGORY_TRANSPORT) return null
         if (sbn.packageName == packageName && sbn.isOngoing) return null
         val ex = n.extras
-        val title = ex.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
-        val text = ex.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
+        val title = (ex.getCharSequence(Notification.EXTRA_TITLE)?.takeIf { it.isNotBlank() }
+            ?: ex.getCharSequence(Notification.EXTRA_TITLE_BIG)?.takeIf { it.isNotBlank() }
+            ?: ex.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE))?.toString().orEmpty()
+        val text = (ex.getCharSequence(Notification.EXTRA_TEXT)?.toString()?.takeIf { it.isNotBlank() }
+            ?: lastMessageText(ex)
+            ?: ex.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.lastOrNull()?.toString()
+            ?: ex.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString()).orEmpty()
         if (title.isBlank() && text.isBlank()) return null
         val lines = ex.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.joinToString("\n")
         val big = ex.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: lines ?: ""

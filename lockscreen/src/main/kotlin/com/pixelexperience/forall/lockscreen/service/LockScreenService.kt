@@ -66,6 +66,7 @@ class LockScreenService : Service() {
             this, receiver, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED
         )
         addOverlayAnchor()
+        LockScreenModule.ensureNotificationListener(this)
         val s = LockSettingsRepository.get(this).settings.value
         CoroutineScope(Dispatchers.Default).launch {
             WallpaperRepository.load(applicationContext, s.wallpaperId, s.wallpaperVersion)
