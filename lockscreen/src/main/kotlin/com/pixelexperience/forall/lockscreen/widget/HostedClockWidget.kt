@@ -7,6 +7,8 @@ import android.view.MotionEvent
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
@@ -34,6 +36,7 @@ fun HostedClockWidget(
     alignment: Alignment = Alignment.TopCenter,
     interactive: Boolean = false,
     previewSize: DpSize? = null,
+    below: @Composable () -> Unit = {},
     fallback: @Composable () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -68,7 +71,11 @@ fun HostedClockWidget(
 
     val fixed: DpSize? = previewSize ?: if (savedW > 0 && savedH > 0) DpSize(savedW.dp, savedH.dp) else null
 
-    BoxWithConstraints(modifier = modifier, contentAlignment = alignment) {
+    Column(
+        modifier.then(if (previewSize == null) Modifier.offset(savedOx.dp, savedOy.dp) else Modifier),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth(), contentAlignment = alignment) {
         val wDp = fixed?.width?.value?.toInt() ?: if (constraints.hasBoundedWidth) maxWidth.value.toInt() else 0
         val hDp = fixed?.height?.value?.toInt() ?: if (constraints.hasBoundedHeight) maxHeight.value.toInt() else 0
 
@@ -95,10 +102,11 @@ fun HostedClockWidget(
                         view.updateAppWidgetSize(Bundle(), wDp, hDp, wDp, hDp)
                     }
                 },
-                modifier = (if (fixed != null) Modifier.size(fixed.width, fixed.height) else Modifier.wrapContentSize())
-                    .then(if (previewSize == null) Modifier.offset(savedOx.dp, savedOy.dp) else Modifier),
+                modifier = (if (fixed != null) Modifier.size(fixed.width, fixed.height) else Modifier.wrapContentSize()),
             )
         }
+    }
+    below()
     }
 }
 

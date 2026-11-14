@@ -93,6 +93,7 @@ fun LockClock(
     modifier: Modifier = Modifier,
     tint2: Color = tint,
     weather: WeatherUi? = null,
+    showClock: Boolean = true,
 ) {
     val ctx = LocalContext.current
     var now by remember { mutableStateOf(Date()) }
@@ -138,7 +139,7 @@ fun LockClock(
             color = tint.copy(alpha = 0.96f),
             shadow = Shadow(Color.Black.copy(alpha = 0.34f), Offset(0f, 2f), 14f),
         )
-        AnimatedContent(
+        if (showClock) AnimatedContent(
             targetState = style,
             transitionSpec = {
                 (fadeIn(LockMotion.effects()) + scaleIn(LockMotion.spatial(), initialScale = 0.85f)) togetherWith

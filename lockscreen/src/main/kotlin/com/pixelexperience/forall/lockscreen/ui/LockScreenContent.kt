@@ -409,6 +409,13 @@ fun LockScreenContent(
                 Spacer(Modifier.height((animatedTop - glanceDp).coerceAtLeast(if (gw != null) 16.dp else 0.dp)))
                 HostedClockWidget(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp).layerFx(e1::value, dragFn, 0.35f, 1.4f, distFn),
+                    below = {
+                        LockClock(
+                            style = settings.clockStyle, scale = settings.clockScale, align = settings.clockAlign, tint = clockTint, tint2 = clockTint2,
+                            weather = if (settings.showWeather) weather else null,
+                            showClock = false,
+                        )
+                    },
                     fallback = {
                         LockClock(
                             style = settings.clockStyle, scale = settings.clockScale, align = settings.clockAlign, tint = clockTint, tint2 = clockTint2,
