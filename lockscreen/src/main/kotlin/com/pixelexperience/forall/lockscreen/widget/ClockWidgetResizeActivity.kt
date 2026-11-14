@@ -76,10 +76,15 @@ class ClockWidgetResizeActivity : ComponentActivity() {
                 val maxH = cfg.screenHeightDp * 0.6f
                 var w by remember { mutableFloatStateOf(startW.coerceIn(80f, maxW)) }
                 var h by remember { mutableFloatStateOf(startH.coerceIn(80f, maxH)) }
+                var ox by remember { mutableFloatStateOf(ClockWidgetStore.offsetXDp(this@ClockWidgetResizeActivity).toFloat()) }
+                var oy by remember { mutableFloatStateOf(ClockWidgetStore.offsetYDp(this@ClockWidgetResizeActivity).toFloat()) }
+                val maxOx = cfg.screenWidthDp / 2f
+                val maxOy = cfg.screenHeightDp / 2f
+                val dens = LocalDensity.current.density
                 val accent = MaterialTheme.colorScheme.primary
 
                 Box(Modifier.fillMaxSize().background(Color(0xFF101418))) {
-                    Box(Modifier.align(Alignment.Center).size(w.dp, h.dp)) {
+                    Box(Modifier.align(Alignment.Center).offset(ox.dp, oy.dp).size(w.dp, h.dp)) {
                         HostedClockWidget(
                             modifier = Modifier.fillMaxSize(),
                             alignment = Alignment.Center,
@@ -87,7 +92,14 @@ class ClockWidgetResizeActivity : ComponentActivity() {
                         )
                         Box(
                             Modifier.fillMaxSize()
-                                .border(2.dp, accent, RoundedCornerShape(16.dp)),
+                                .border(2.dp, accent, RoundedCornerShape(16.dp))
+                                .pointerInput(Unit) {
+                                    detectDragGestures { change, drag ->
+                                        change.consume()
+                                        ox = (ox + drag.x / dens).coerceIn(-maxOx, maxOx)
+                                        oy = (oy + drag.y / dens).coerceIn(-maxOy, maxOy)
+                                    }
+                                },
                         )
                         Handle(Modifier.align(Alignment.CenterEnd).offset(x = 14.dp), accent) { dx, _ ->
                             w = (w + dx * 2).coerceIn(80f, maxW)
@@ -108,10 +120,12 @@ class ClockWidgetResizeActivity : ComponentActivity() {
                     ) {
                         TextButton(onClick = {
                             ClockWidgetStore.setSize(this@ClockWidgetResizeActivity, 0, 0)
+                            ClockWidgetStore.setOffset(this@ClockWidgetResizeActivity, 0, 0)
                             finish()
                         }) { Text("Automático") }
                         Button(onClick = {
                             ClockWidgetStore.setSize(this@ClockWidgetResizeActivity, w.roundToInt(), h.roundToInt())
+                            ClockWidgetStore.setOffset(this@ClockWidgetResizeActivity, ox.roundToInt(), oy.roundToInt())
                             finish()
                         }) { Text("Salvar") }
                     }

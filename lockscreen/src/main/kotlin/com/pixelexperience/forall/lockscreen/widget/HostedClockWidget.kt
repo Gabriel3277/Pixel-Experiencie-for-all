@@ -7,6 +7,7 @@ import android.view.MotionEvent
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.runtime.Composable
@@ -40,12 +41,16 @@ fun HostedClockWidget(
     var widgetId by remember { mutableStateOf(ClockWidgetStore.widgetId(context)) }
     var savedW by remember { mutableStateOf(ClockWidgetStore.widthDp(context)) }
     var savedH by remember { mutableStateOf(ClockWidgetStore.heightDp(context)) }
+    var savedOx by remember { mutableStateOf(ClockWidgetStore.offsetXDp(context)) }
+    var savedOy by remember { mutableStateOf(ClockWidgetStore.offsetYDp(context)) }
 
     DisposableEffect(controller) {
         val unregister = ClockWidgetStore.register(context) {
             widgetId = ClockWidgetStore.widgetId(context)
             savedW = ClockWidgetStore.widthDp(context)
             savedH = ClockWidgetStore.heightDp(context)
+            savedOx = ClockWidgetStore.offsetXDp(context)
+            savedOy = ClockWidgetStore.offsetYDp(context)
         }
         controller.startListening()
         onDispose {
@@ -90,7 +95,8 @@ fun HostedClockWidget(
                         view.updateAppWidgetSize(Bundle(), wDp, hDp, wDp, hDp)
                     }
                 },
-                modifier = if (fixed != null) Modifier.size(fixed.width, fixed.height) else Modifier.wrapContentSize(),
+                modifier = (if (fixed != null) Modifier.size(fixed.width, fixed.height) else Modifier.wrapContentSize())
+                    .then(if (previewSize == null) Modifier.offset(savedOx.dp, savedOy.dp) else Modifier),
             )
         }
     }

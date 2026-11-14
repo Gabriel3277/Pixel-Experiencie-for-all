@@ -15,6 +15,8 @@ object ClockWidgetStore {
     private const val KEY_PROVIDER = "provider"
     private const val KEY_W = "width_dp"
     private const val KEY_H = "height_dp"
+    private const val KEY_OX = "offset_x_dp"
+    private const val KEY_OY = "offset_y_dp"
 
     const val INVALID = AppWidgetManager.INVALID_APPWIDGET_ID
 
@@ -30,8 +32,16 @@ object ClockWidgetStore {
         prefs(context).edit()
             .putInt(KEY_ID, id)
             .putString(KEY_PROVIDER, provider.flattenToString())
-            .remove(KEY_W).remove(KEY_H)
+            .remove(KEY_W).remove(KEY_H).remove(KEY_OX).remove(KEY_OY)
             .apply()
+    }
+
+    fun offsetXDp(context: Context): Int = prefs(context).getInt(KEY_OX, 0)
+
+    fun offsetYDp(context: Context): Int = prefs(context).getInt(KEY_OY, 0)
+
+    fun setOffset(context: Context, x: Int, y: Int) {
+        prefs(context).edit().putInt(KEY_OX, x).putInt(KEY_OY, y).apply()
     }
 
     fun widthDp(context: Context): Int = prefs(context).getInt(KEY_W, 0)
@@ -43,7 +53,7 @@ object ClockWidgetStore {
     }
 
     fun clear(context: Context) {
-        prefs(context).edit().remove(KEY_ID).remove(KEY_PROVIDER).remove(KEY_W).remove(KEY_H).apply()
+        prefs(context).edit().remove(KEY_ID).remove(KEY_PROVIDER).remove(KEY_W).remove(KEY_H).remove(KEY_OX).remove(KEY_OY).apply()
     }
 
     /** Observa mudanças. Retorna a função que cancela o registro. */
