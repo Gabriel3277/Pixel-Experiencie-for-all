@@ -2,6 +2,7 @@ package com.pixelexperience.forall.lockscreen.ui
 
 import android.app.ActivityOptions
 import android.app.KeyguardManager
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -82,18 +83,9 @@ class LockScreenActivity : ComponentActivity() {
                     onUnlockAnimated = { if (!isFinishing) finishAndRemoveTask() },
                     onShortcut = { runShortcut(it) },
                     onOpenNotification = { n ->
-                        unlock(onSuccess = {
-                            n.contentIntent?.let { pi ->
-                                runCatching {
-                                    // Android 14+: o remetente precisa permitir explicitamente abrir a activity
-                                    val opts = ActivityOptions.makeBasic()
-                                        .setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
-                                        .toBundle()
-                                    pi.send(this@LockScreenActivity, 0, null, null, null, null, opts)
-                                }
-                            }
-                        })
+                        unlock(onSuccess = { n.contentIntent?.let { sendPending(it) } })
                     },
+                    onAction = { act -> unlock(onSuccess = { act.intent?.let { sendPending(it) } }) },
                     onDismissNotification = { LockNotificationListener.cancel(it) },
                     onClearAll = { LockNotificationListener.cancelAll() },
                     onRequestUnlock = { cb -> unlock(onFail = { cb(false) }) },
@@ -126,6 +118,16 @@ class LockScreenActivity : ComponentActivity() {
             })
         }.isSuccess
         if (!started) { unlockPending = false; onFail() }
+    }
+
+    /** Android 14+: o remetente precisa permitir explicitamente iniciar a activity do PendingIntent. */
+    private fun sendPending(pi: PendingIntent) {
+        runCatching {
+            val opts = ActivityOptions.makeBasic()
+                .setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+                .toBundle()
+            pi.send(this, 0, null, null, null, null, opts)
+        }
     }
 
     private fun launchAfterUnlock(intent: Intent) {

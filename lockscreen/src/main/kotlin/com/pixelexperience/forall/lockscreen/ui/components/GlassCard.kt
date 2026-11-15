@@ -39,7 +39,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
@@ -56,7 +59,10 @@ class Backdrop(val image: ImageBitmap) {
 
 val LocalBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 
-/** Superfície tonal do Material 3: cor sólida do tema, sem blur do fundo e sem efeito de vidro. */
+/**
+ * Vidro real: desenha a miniatura borrada do wallpaper (Backdrop) alinhada à posição do card na tela,
+ * com tint tonal por cima e um fio de luz na borda. Sem Backdrop (ex.: ainda carregando) cai para cor sólida.
+ */
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
@@ -65,10 +71,38 @@ fun GlassCard(
     opacity: Float,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    Box(
-        modifier.clip(shape).background(tint.copy(alpha = opacity.coerceIn(0f, 1f)), shape),
-        content = content,
-    )
+    val backdrop = LocalBackdrop.current
+    val coords = remember { arrayOfNulls<LayoutCoordinates>(1) }
+    val a = opacity.coerceIn(0f, 1f)
+    val glass = if (backdrop == null) {
+        modifier.clip(shape).background(tint.copy(alpha = a), shape)
+    } else {
+        modifier
+            .clip(shape)
+            .onGloballyPositioned { coords[0] = it }
+            .drawBehind {
+                val c = coords[0]?.takeIf { it.isAttached } ?: return@drawBehind
+                val rs = backdrop.rootSize
+                if (rs.width < 1f || rs.height < 1f) return@drawBehind
+                val img = backdrop.image
+                val p = (c.positionInRoot() - backdrop.origin) / backdrop.coordScale
+                // mesma geometria do wallpaper da tela (Crop + escala 1.06 no centro)
+                val s = max(rs.width / img.width, rs.height / img.height) * 1.06f
+                val dw = img.width * s
+                val dh = img.height * s
+                val ox = (rs.width - dw) / 2f - p.x
+                val oy = (rs.height - dh) / 2f - p.y
+                drawImage(
+                    img,
+                    dstOffset = IntOffset(ox.roundToInt(), oy.roundToInt()),
+                    dstSize = IntSize(dw.roundToInt(), dh.roundToInt()),
+                    filterQuality = FilterQuality.Medium,
+                )
+            }
+            .background(tint.copy(alpha = a), shape)
+            .border(0.6.dp, Color.White.copy(alpha = 0.10f), shape)
+    }
+    Box(glass, content = content)
 }
 
 /**

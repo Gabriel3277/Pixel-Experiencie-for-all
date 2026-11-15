@@ -1,6 +1,8 @@
 package com.pixelexperience.forall.lockscreen.notifications
 
 import android.app.Notification
+import android.app.NotificationManager
+import android.graphics.Bitmap
 import android.app.PendingIntent
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -8,6 +10,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.flow.MutableStateFlow
+
+/** Ação da notificação (botão). O PendingIntent só é disparado depois do desbloqueio. */
+data class LockAction(val title: String, val intent: PendingIntent?)
 
 data class LockNotification(
     val key: String,
@@ -23,6 +28,10 @@ data class LockNotification(
     val ongoing: Boolean,
     val visibility: Int,
     val contentIntent: PendingIntent?,
+    val importance: Int = NotificationManager.IMPORTANCE_DEFAULT,
+    val picture: ImageBitmap? = null,
+    val actions: List<LockAction> = emptyList(),
+    val hidden: Boolean = false,
 )
 
 object LockNotificationRepository {
@@ -52,9 +61,10 @@ class LockNotificationListener : NotificationListenerService() {
         val all = runCatching { activeNotifications }.getOrNull().orEmpty()
         // o resumo de grupo só entra quando o app não postou as notificações filhas (senão duplicaria)
         val withChildren = all.filter { !it.isSummary() }.map { it.packageName to it.groupKey }.toSet()
+        val ranking = runCatching { currentRanking }.getOrNull()
         val list = all
             .filter { !it.isSummary() || (it.packageName to it.groupKey) !in withChildren }
-            .mapNotNull { sbn -> runCatching { convert(sbn) }.getOrNull() }
+            .mapNotNull { sbn -> runCatching { convert(sbn, ranking) }.getOrNull() }
             .sortedByDescending { it.postTime }
         LockNotificationRepository.items.value = list
     }
@@ -68,7 +78,7 @@ class LockNotificationListener : NotificationListenerService() {
             ?.let { (it as? android.os.Bundle)?.getCharSequence("text")?.toString() }
             ?.takeIf { it.isNotBlank() }
 
-    private fun convert(sbn: StatusBarNotification): LockNotification? {
+    private fun convert(sbn: StatusBarNotification, ranking: NotificationListenerService.RankingMap?): LockNotification? {
         val n = sbn.notification
         if (n.category == Notification.CATEGORY_TRANSPORT) return null
         if (sbn.packageName == packageName && sbn.isOngoing) return null
@@ -87,6 +97,18 @@ class LockNotificationListener : NotificationListenerService() {
             packageManager.getApplicationLabel(packageManager.getApplicationInfo(sbn.packageName, 0)).toString()
         }.getOrElse { ex.getString("android.substName") ?: sbn.packageName.substringAfterLast('.') }
         val icon = runCatching { n.smallIcon?.loadDrawable(this)?.toBitmap(72, 72)?.asImageBitmap() }.getOrNull()
+        val r = NotificationListenerService.Ranking()
+        val importance = if (ranking != null && ranking.getRanking(sbn.key, r)) r.importance else NotificationManager.IMPORTANCE_DEFAULT
+        val picture = runCatching {
+            ex.getParcelable(Notification.EXTRA_PICTURE, Bitmap::class.java)?.let { b ->
+                val f = if (b.width > 720) 720f / b.width else 1f
+                (if (f < 1f) Bitmap.createScaledBitmap(b, 720, (b.height * f).toInt().coerceAtLeast(1), true) else b).asImageBitmap()
+            }
+        }.getOrNull()
+        val actions = n.actions.orEmpty()
+            .filter { it.remoteInputs.isNullOrEmpty() && !it.title.isNullOrBlank() }
+            .take(3)
+            .map { LockAction(it.title.toString(), it.actionIntent) }
         return LockNotification(
             key = sbn.key,
             packageName = sbn.packageName,
@@ -101,6 +123,9 @@ class LockNotificationListener : NotificationListenerService() {
             ongoing = sbn.isOngoing,
             visibility = n.visibility,
             contentIntent = n.contentIntent,
+            importance = importance,
+            picture = picture,
+            actions = actions,
         )
     }
 
