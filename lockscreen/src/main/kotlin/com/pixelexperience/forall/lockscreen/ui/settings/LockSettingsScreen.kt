@@ -278,6 +278,7 @@ fun LockSettingsScreen(onBack: () -> Unit) {
                 }
                 "Notificações" -> {
                 Section("Notificações") {
+                    SwitchRow("Estilo vidro (desligado = cartões sólidos)", s.glassNotifications) { v -> set { it.copy(glassNotifications = v) } }
                     SliderRow("Transparência dos cards", s.cardOpacity, 0.1f..0.9f, { "${(it * 100).roundToInt()}%" }) { v -> set { it.copy(cardOpacity = v) } }
                     SliderRow("Blur dos cards", s.cardBlur, 0f..1f, { "${(it * 100).roundToInt()}%" }) { v -> set { it.copy(cardBlur = v) } }
                     SwitchRow("Agrupar por app", s.groupNotifications) { v -> set { it.copy(groupNotifications = v) } }

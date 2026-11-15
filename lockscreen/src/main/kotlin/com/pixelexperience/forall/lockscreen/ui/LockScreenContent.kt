@@ -263,9 +263,9 @@ fun LockScreenContent(
     }
 
     // vidro dos cards: miniatura borrada do wallpaper (recalcula só quando o nível de blur muda)
-    val backdropImage by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wallpaper, settings.cardBlur) {
+    val backdropImage by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wallpaper, settings.cardBlur, settings.glassNotifications) {
         val w = wallpaper
-        value = if (w == null) null else withContext(Dispatchers.Default) {
+        value = if (w == null || !settings.glassNotifications) null else withContext(Dispatchers.Default) {
             runCatching { BackdropBlur.make(w.bitmap, settings.cardBlur).asImageBitmap() }.getOrNull()
         }
     }
@@ -429,6 +429,7 @@ fun LockScreenContent(
                     NotificationsList(
                         items = shown,
                         grouped = settings.groupNotifications,
+                        glass = settings.glassNotifications,
                         opacity = settings.cardOpacity,
                         tint = scheme.surfaceContainerHigh,
                         accent = scheme.primary,

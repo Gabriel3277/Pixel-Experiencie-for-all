@@ -43,6 +43,8 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -78,6 +80,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pixelexperience.forall.lockscreen.notifications.LockAction
 import com.pixelexperience.forall.lockscreen.notifications.LockNotification
+import com.pixelexperience.forall.lockscreen.ui.components.GlassCard
 import com.pixelexperience.forall.lockscreen.ui.theme.LockMotion
 import com.pixelexperience.forall.lockscreen.ui.theme.lockFont
 import kotlinx.coroutines.CoroutineStart
@@ -91,6 +94,9 @@ import kotlin.math.sign
 private val OuterCorner = 28.dp
 private val InnerCorner = 6.dp
 private val CardGap = 4.dp
+
+/** Não nulo = estilo vidro (valor = opacidade do tint). Nulo = cartões sólidos. */
+private val LocalGlassOpacity = staticCompositionLocalOf<Float?> { null }
 
 private class Group(val id: String, val appName: String, val items: List<LockNotification>)
 
@@ -117,7 +123,12 @@ private fun isPt() = Locale.getDefault().language == "pt"
 /** Cartão sólido: cor opaca, sem blur, sem transparência, sem degradê. */
 @Composable
 private fun SolidCard(modifier: Modifier, shape: Shape, color: Color, content: @Composable BoxScope.() -> Unit) {
-    Box(modifier.clip(shape).background(color, shape), content = content)
+    val glass = LocalGlassOpacity.current
+    if (glass != null) {
+        GlassCard(modifier = modifier, shape = shape, tint = color, opacity = glass, content = content)
+    } else {
+        Box(modifier.clip(shape).background(color, shape), content = content)
+    }
 }
 
 /**
@@ -132,7 +143,7 @@ private fun SolidCard(modifier: Modifier, shape: Shape, color: Color, content: @
 fun NotificationsList(
     items: List<LockNotification>,
     grouped: Boolean,
-    @Suppress("UNUSED_PARAMETER") opacity: Float,
+    opacity: Float,
     tint: Color,
     accent: Color,
     preview: Boolean,
@@ -141,6 +152,7 @@ fun NotificationsList(
     onClearAll: () -> Unit,
     modifier: Modifier = Modifier,
     onAction: (LockAction) -> Unit = {},
+    glass: Boolean = false,
 ) {
     val pal = remember(tint, accent) { Pal(tint, accent) }
     var showQuiet by rememberSaveable { mutableStateOf(false) }
@@ -169,6 +181,7 @@ fun NotificationsList(
         }
     }
 
+    CompositionLocalProvider(LocalGlassOpacity provides (if (glass) opacity else null)) {
     LazyColumn(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(CardGap),
@@ -200,6 +213,7 @@ fun NotificationsList(
                 }
             }
         }
+    }
     }
 }
 
@@ -389,7 +403,11 @@ private fun NotificationCard(
 
     SolidCard(
         modifier = modifier.fillMaxWidth().swipeAway(dismissible, onDismiss)
-            .shadow(2.dp, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.18f), spotColor = Color.Black.copy(alpha = 0.18f)),
+            .then(
+                if (LocalGlassOpacity.current == null) {
+                    Modifier.shadow(2.dp, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.18f), spotColor = Color.Black.copy(alpha = 0.18f))
+                } else Modifier,
+            ),
         shape = shape, color = cardColor,
     ) {
         Row(

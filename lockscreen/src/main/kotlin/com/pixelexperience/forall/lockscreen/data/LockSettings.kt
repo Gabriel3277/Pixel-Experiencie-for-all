@@ -45,6 +45,7 @@ data class LockSettings(
     val bgDim: Float = 0.30f,
     val cardOpacity: Float = 0.50f,
     val cardBlur: Float = 0.60f,
+    val glassNotifications: Boolean = false,
     val groupNotifications: Boolean = true,
     val hideOngoing: Boolean = true,
     val showContentWhenSecure: Boolean = false,
@@ -69,6 +70,7 @@ private object K {
     val cardOpacity = floatPreferencesKey("card_opacity")
     val cardBlur = floatPreferencesKey("card_blur")
     val group = booleanPreferencesKey("group")
+    val glassNotif = booleanPreferencesKey("glass_notifications")
     val hideOngoing = booleanPreferencesKey("hide_ongoing")
     val showSecure = booleanPreferencesKey("show_secure")
     val left = stringPreferencesKey("left_shortcut")
@@ -97,6 +99,7 @@ private fun Preferences.toSettings(): LockSettings {
         cardOpacity = this[K.cardOpacity] ?: d.cardOpacity,
         cardBlur = this[K.cardBlur] ?: d.cardBlur,
         groupNotifications = this[K.group] ?: d.groupNotifications,
+        glassNotifications = this[K.glassNotif] ?: d.glassNotifications,
         hideOngoing = this[K.hideOngoing] ?: d.hideOngoing,
         showContentWhenSecure = this[K.showSecure] ?: d.showContentWhenSecure,
         leftShortcut = enumOf(K.left, d.leftShortcut),
@@ -119,6 +122,7 @@ private fun MutablePreferences.write(s: LockSettings) {
     this[K.cardOpacity] = s.cardOpacity
     this[K.cardBlur] = s.cardBlur
     this[K.group] = s.groupNotifications
+    this[K.glassNotif] = s.glassNotifications
     this[K.hideOngoing] = s.hideOngoing
     this[K.showSecure] = s.showContentWhenSecure
     this[K.left] = s.leftShortcut.name
