@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -133,11 +134,11 @@ fun LockClock(
         // data + clima logo abaixo do relógio
         val dateStyle = TextStyle(
             fontFamily = DateFont,
-            fontWeight = FontWeight.Bold,
-            fontSize = (20f * scale.coerceIn(0.9f, 1.3f)).sp,
-            letterSpacing = 0.25.sp,
-            color = tint.copy(alpha = 0.96f),
-            shadow = Shadow(Color.Black.copy(alpha = 0.34f), Offset(0f, 2f), 14f),
+            fontWeight = FontWeight.SemiBold,
+            fontSize = (22f * scale.coerceIn(0.9f, 1.3f)).sp,
+            letterSpacing = 0.1.sp,
+            color = tint,
+            shadow = Shadow(Color.Black.copy(alpha = 0.22f), Offset(0f, 1f), 12f),
         )
         if (showClock) AnimatedContent(
             targetState = style,
@@ -149,11 +150,11 @@ fun LockClock(
             contentAlignment = if (align == ClockAlign.START) Alignment.TopStart else Alignment.TopCenter,
             label = "clockStyle",
         ) { st -> ClockFace(st, hh, mm, scale, horizontal, tint, tint2) }
-        Row(Modifier.padding(start = if (align == ClockAlign.START) 6.dp else 0.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(start = if (align == ClockAlign.START) 6.dp else 0.dp, top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(text = date, style = dateStyle)
             if (weather != null) {
                 Spacer(Modifier.width(10.dp))
-                Icon(weatherIcon(weather.code, weather.isDay), null, tint = tint, modifier = Modifier.size((22f * scale.coerceIn(0.9f, 1.3f)).dp))
+                Icon(weatherIcon(weather.code, weather.isDay), null, tint = tint, modifier = Modifier.size((26f * scale.coerceIn(0.9f, 1.3f)).dp))
                 Spacer(Modifier.width(4.dp))
                 Text("${weather.temp}°" + if (weather.fahrenheit) "F" else "", style = dateStyle)
             }
@@ -171,6 +172,13 @@ private fun weatherIcon(code: Int, day: Boolean): ImageVector = when (code) {
     else -> Icons.Rounded.Cloud
 }
 
+/** Sobe o conteúdo e encolhe a altura medida: aproxima as duas linhas do relógio sem cortar nada. */
+private fun Modifier.tuckUp(amountDp: Float): Modifier = layout { m, c ->
+    val p = m.measure(c)
+    val pull = amountDp.dp.roundToPx().coerceIn(0, p.height)
+    layout(p.width, p.height - pull) { p.place(0, -pull) }
+}
+
 @Composable
 private fun ClockFace(style: ClockStyle, hh: String, mm: String, scale: Float, h: Alignment.Horizontal, tint: Color, tint2: Color) {
     val mid = lerp(tint, tint2, 0.5f)
@@ -178,15 +186,15 @@ private fun ClockFace(style: ClockStyle, hh: String, mm: String, scale: Float, h
         // relógio padrão do Pixel: duas linhas, números grandes e arredondados
         ClockStyle.STACKED -> Column(horizontalAlignment = h) {
             Digits(hh, 118f, 640, tint, scale, colorEnd = mid, width = 106f)
-            Digits(mm, 118f, 640, mid, scale, colorEnd = tint2, width = 106f)
+            Box(Modifier.tuckUp(118f * scale * 0.22f)) { Digits(mm, 118f, 640, mid, scale, colorEnd = tint2, width = 106f) }
         }
         ClockStyle.BOLD -> Column(horizontalAlignment = h) {
             Digits(hh, 118f, 860, tint, scale, colorEnd = mid, width = 122f)
-            Digits(mm, 118f, 860, mid, scale, colorEnd = tint2, width = 122f)
+            Box(Modifier.tuckUp(118f * scale * 0.22f)) { Digits(mm, 118f, 860, mid, scale, colorEnd = tint2, width = 122f) }
         }
         ClockStyle.OUTLINE -> Column(horizontalAlignment = h) {
             Digits(hh, 118f, 760, tint, scale, colorEnd = mid, width = 112f, outline = true)
-            Digits(mm, 118f, 760, mid, scale, colorEnd = tint2, width = 112f, outline = true)
+            Box(Modifier.tuckUp(118f * scale * 0.22f)) { Digits(mm, 118f, 760, mid, scale, colorEnd = tint2, width = 112f, outline = true) }
         }
         ClockStyle.INFLATE -> FontStack(FontFamily(Font(R.font.inflate)), hh, mm, tint, tint2, scale)
         ClockStyle.GROWTH -> FontStack(FontFamily(Font(R.font.growth)), hh, mm, tint, tint2, scale)

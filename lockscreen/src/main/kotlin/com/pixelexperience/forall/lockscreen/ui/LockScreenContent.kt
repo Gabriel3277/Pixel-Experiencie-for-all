@@ -475,7 +475,7 @@ fun LockScreenContent(
                                 style = TextStyle(
                                     fontFamily = lockFont(600), fontSize = 15.sp, letterSpacing = 0.1.sp,
                                     color = Color.White.copy(alpha = 0.92f),
-                                    shadow = Shadow(Color.Black.copy(alpha = 0.35f), Offset(0f, 2f), 8f),
+                                    shadow = Shadow(Color.Black.copy(alpha = 0.22f), Offset(0f, 1f), 12f),
                                 ),
                             )
                         }
@@ -521,7 +521,7 @@ private fun GlanceInfo(w: WeatherUi, tint: Color, modifier: Modifier = Modifier)
         diff > 0 -> if (pt) "$diff° mais quente que hoje" else "$diff° warmer than today"
         else -> if (pt) "${-diff}° mais frio que hoje" else "${-diff}° cooler than today"
     }
-    val sh = Shadow(Color.Black.copy(alpha = 0.30f), Offset(0f, 2f), 10f)
+    val sh = Shadow(Color.Black.copy(alpha = 0.22f), Offset(0f, 1f), 12f)
     androidx.compose.foundation.layout.Column(modifier) {
         Text(l1, style = TextStyle(fontFamily = DateFont, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 20.sp, color = tint, shadow = sh), maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (l2 != null) Text(l2, style = TextStyle(fontFamily = DateFont, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 16.sp, color = tint.copy(alpha = 0.85f), shadow = sh))

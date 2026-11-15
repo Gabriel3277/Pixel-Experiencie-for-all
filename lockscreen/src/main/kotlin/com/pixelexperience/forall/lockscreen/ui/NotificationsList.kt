@@ -57,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -108,7 +109,7 @@ private class Pal(val tint: Color, val accent: Color) {
     val onCard: Color = if (tint.luminance() > 0.5f) Color(0xFF1C1B1F) else Color(0xFFE6E1E5)
     val stack1: Color = lerp(tint, Color.Black, 0.10f)
     val stack2: Color = lerp(tint, Color.Black, 0.20f)
-    fun card(priority: Boolean): Color = if (priority) lerp(tint, accent, 0.22f) else tint
+    fun card(priority: Boolean): Color = tint
 }
 
 private fun isPt() = Locale.getDefault().language == "pt"
@@ -317,7 +318,7 @@ private fun GroupBlock(
 /** Cabeçalho do grupo expandido: ícone, "App · N", botão Limpar e seta de recolher. */
 @Composable
 private fun GroupHeader(g: Group, pal: Pal, canDismiss: Boolean, onDismissAll: () -> Unit, onCollapse: () -> Unit) {
-    val sh = Shadow(Color.Black.copy(alpha = 0.35f), Offset(0f, 2f), 8f)
+    val sh = Shadow(Color.Black.copy(alpha = 0.22f), Offset(0f, 1f), 12f)
     Row(
         Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(start = 8.dp, end = 4.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -387,7 +388,8 @@ private fun NotificationCard(
     val chipColor = lerp(cardColor, main, 0.14f)
 
     SolidCard(
-        modifier = modifier.fillMaxWidth().swipeAway(dismissible, onDismiss),
+        modifier = modifier.fillMaxWidth().swipeAway(dismissible, onDismiss)
+            .shadow(2.dp, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.18f), spotColor = Color.Black.copy(alpha = 0.18f)),
         shape = shape, color = cardColor,
     ) {
         Row(
@@ -491,7 +493,7 @@ private fun SectionLabel(text: String, pal: Pal, modifier: Modifier = Modifier, 
             text, modifier = Modifier.weight(1f),
             style = TextStyle(
                 color = Color.White, fontSize = 13.sp, fontFamily = lockFont(600),
-                shadow = Shadow(Color.Black.copy(alpha = 0.35f), Offset(0f, 2f), 8f),
+                shadow = Shadow(Color.Black.copy(alpha = 0.22f), Offset(0f, 1f), 12f),
             ),
         )
         ChevronButton(
