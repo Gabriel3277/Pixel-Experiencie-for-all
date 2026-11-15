@@ -96,7 +96,7 @@ import com.pixelexperience.forall.lockscreen.notifications.LockNotification
 import com.pixelexperience.forall.lockscreen.ui.components.GlassCard
 import com.pixelexperience.forall.lockscreen.ui.theme.LockMotion
 import com.pixelexperience.forall.lockscreen.ui.theme.lockColorScheme
-import com.pixelexperience.forall.lockscreen.ui.theme.lockFont
+import com.pixelexperience.forall.lockscreen.ui.theme.UiFont
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -474,7 +474,7 @@ private fun GroupSummaryCard(
                 AppIcon(head, 24.dp, pal)
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    g.appName, color = sub, fontSize = 13.sp, fontFamily = lockFont(600),
+                    g.appName, color = sub, fontSize = 13.sp, fontFamily = UiFont,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
                 )
                 CountChevronPill(g.items.size, 0f, pal.chip, main, onExpand)
@@ -483,19 +483,19 @@ private fun GroupSummaryCard(
                 Text(
                     text = buildAnnotatedString {
                         if (!n.hidden && n.title.isNotBlank()) {
-                            withStyle(SpanStyle(fontFamily = lockFont(600), color = main)) { append(n.title) }
+                            withStyle(SpanStyle(fontFamily = UiFont, color = main)) { append(n.title) }
                             append("  ")
                         }
                         append(n.text)
                     },
-                    color = sub, fontSize = 14.sp, fontFamily = lockFont(400),
+                    color = sub, fontSize = 14.sp, fontFamily = UiFont,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 )
             }
             if (g.items.size > 3) {
                 Text(
-                    "+${g.items.size - 3}", color = sub, fontSize = 12.sp, fontFamily = lockFont(600),
+                    "+${g.items.size - 3}", color = sub, fontSize = 12.sp, fontFamily = UiFont,
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
@@ -515,7 +515,7 @@ private fun GroupHeader(g: Group, pal: Pal, canDismiss: Boolean, onDismissAll: (
         Spacer(Modifier.width(8.dp))
         Text(
             "${g.appName} · ${g.items.size}", modifier = Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis,
-            style = TextStyle(color = Color.White, fontSize = 14.sp, fontFamily = lockFont(600), shadow = sh),
+            style = TextStyle(color = Color.White, fontSize = 14.sp, fontFamily = UiFont, shadow = sh),
         )
         Spacer(Modifier.weight(1f))
         if (canDismiss) {
@@ -523,7 +523,7 @@ private fun GroupHeader(g: Group, pal: Pal, canDismiss: Boolean, onDismissAll: (
                 Text(
                     if (isPt()) "Limpar" else "Clear",
                     modifier = Modifier.clickable { onDismissAll() }.padding(horizontal = 14.dp, vertical = 8.dp),
-                    color = pal.onClear, fontSize = 13.sp, fontFamily = lockFont(600), maxLines = 1,
+                    color = pal.onClear, fontSize = 13.sp, fontFamily = UiFont, maxLines = 1,
                 )
             }
             Spacer(Modifier.width(8.dp))
@@ -590,19 +590,19 @@ private fun NotificationCard(
             Column(Modifier.weight(1f)) {
                 if (textExpanded) {
                     Text(
-                        n.appName, color = sub, fontSize = 12.sp, fontFamily = lockFont(600),
+                        n.appName, color = sub, fontSize = 12.sp, fontFamily = UiFont,
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
                 }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        n.title.ifBlank { n.appName }, color = main, fontSize = 15.sp, fontFamily = lockFont(600),
+                        n.title.ifBlank { n.appName }, color = main, fontSize = 15.sp, fontFamily = UiFont,
                         maxLines = if (textExpanded) 2 else 1, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
                     Text(
                         "  ·  " + relTime(ctx, n.postTime), color = sub, fontSize = 12.sp,
-                        fontFamily = lockFont(400), maxLines = 1, softWrap = false,
+                        fontFamily = UiFont, maxLines = 1, softWrap = false,
                     )
                 }
                 if (n.hidden) {
@@ -611,7 +611,7 @@ private fun NotificationCard(
                         Spacer(Modifier.width(6.dp))
                         Text(
                             n.text, color = sub, fontSize = 14.sp,
-                            fontFamily = lockFont(400), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            fontFamily = UiFont, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                     }
                 } else {
@@ -619,7 +619,7 @@ private fun NotificationCard(
                     if (body.isNotBlank()) {
                         Text(
                             body, color = sub, fontSize = 14.sp, lineHeight = 20.sp,
-                            fontFamily = lockFont(400), maxLines = if (textExpanded) 8 else 1, overflow = TextOverflow.Ellipsis,
+                            fontFamily = UiFont, maxLines = if (textExpanded) 8 else 1, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                         )
                     }
@@ -640,7 +640,7 @@ private fun NotificationCard(
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
-                                        a.title, color = main, fontSize = 13.sp, fontFamily = lockFont(600),
+                                        a.title, color = main, fontSize = 13.sp, fontFamily = UiFont,
                                         maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
                                     )
                                 }
@@ -679,7 +679,7 @@ private fun SectionLabel(text: String, pal: Pal, modifier: Modifier = Modifier, 
         Text(
             text, modifier = Modifier.weight(1f),
             style = TextStyle(
-                color = Color.White, fontSize = 14.sp, fontFamily = lockFont(600),
+                color = Color.White, fontSize = 14.sp, fontFamily = UiFont,
                 shadow = Shadow(Color.Black.copy(alpha = 0.22f), Offset(0f, 1f), 12f),
             ),
         )
@@ -744,7 +744,7 @@ private fun FooterPill(text: String, bg: Color, fg: Color, onClick: () -> Unit) 
             text,
             modifier = Modifier.clickable(interactionSource = src, indication = null, onClick = onClick)
                 .padding(horizontal = 24.dp, vertical = 14.dp),
-            color = fg, fontSize = 14.sp, fontFamily = lockFont(600), maxLines = 1,
+            color = fg, fontSize = 14.sp, fontFamily = UiFont, maxLines = 1,
         )
     }
 }
@@ -757,7 +757,7 @@ private fun CountChevronPill(count: Int, rotation: Float, bg: Color, fg: Color, 
             .padding(start = 12.dp, end = 6.dp, top = 5.dp, bottom = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("$count", color = fg, fontSize = 14.sp, fontFamily = lockFont(600), maxLines = 1)
+        Text("$count", color = fg, fontSize = 14.sp, fontFamily = UiFont, maxLines = 1)
         Icon(Icons.Filled.KeyboardArrowDown, null, tint = fg, modifier = Modifier.size(22.dp).rotate(rotation))
     }
 }

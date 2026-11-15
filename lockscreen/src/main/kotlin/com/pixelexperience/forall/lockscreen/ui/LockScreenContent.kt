@@ -72,7 +72,7 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.pixelexperience.forall.lockscreen.data.WeatherUi
-import com.pixelexperience.forall.lockscreen.ui.theme.lockFont
+import com.pixelexperience.forall.lockscreen.ui.theme.UiFont
 import java.util.Locale
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.BlurEffect
@@ -473,11 +473,11 @@ fun LockScreenContent(
                             Column(Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
                                 Text(
                                     "Notificações desativadas", color = scheme.onSurface,
-                                    style = TextStyle(fontFamily = lockFont(600), fontSize = 15.sp),
+                                    style = TextStyle(fontFamily = UiFont, fontSize = 15.sp),
                                 )
                                 Text(
                                     "Toque para liberar o acesso às notificações", color = scheme.onSurfaceVariant,
-                                    style = TextStyle(fontFamily = lockFont(400), fontSize = 14.sp),
+                                    style = TextStyle(fontFamily = UiFont, fontSize = 14.sp),
                                 )
                             }
                         }
@@ -496,7 +496,7 @@ fun LockScreenContent(
                             Text(
                                 bat, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
                                 style = TextStyle(
-                                    fontFamily = lockFont(600), fontSize = 15.sp, letterSpacing = 0.1.sp,
+                                    fontFamily = UiFont, fontSize = 15.sp, letterSpacing = 0.1.sp,
                                     color = Color.White.copy(alpha = 0.92f),
                                     shadow = Shadow(Color.Black.copy(alpha = 0.22f), Offset(0f, 1f), 12f),
                                 ),

@@ -82,7 +82,7 @@ import androidx.compose.ui.unit.sp
 import com.pixelexperience.forall.lockscreen.media.LockMediaState
 import com.pixelexperience.forall.lockscreen.media.MediaInfo
 import com.pixelexperience.forall.lockscreen.ui.theme.LockMotion
-import com.pixelexperience.forall.lockscreen.ui.theme.lockFont
+import com.pixelexperience.forall.lockscreen.ui.theme.UiFont
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -168,12 +168,12 @@ private fun PlayerBody(
                 ) { (t, a) ->
                     Column {
                         Text(
-                            t, color = onTint, fontSize = 16.sp, fontFamily = lockFont(700),
+                            t, color = onTint, fontSize = 16.sp, fontFamily = UiFont,
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                         if (a.isNotBlank()) {
                             Text(
-                                a, color = sub, fontSize = 13.sp, fontFamily = lockFont(400),
+                                a, color = sub, fontSize = 13.sp, fontFamily = UiFont,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis,
                             )
                         }
@@ -213,8 +213,8 @@ private fun PlayerBody(
                 if (info.canSeek) ({ f: Float -> media.seekTo((f * info.durationMs).toLong()) }) else null
             ProgressBar(frac, chip, accent, 6.dp, seek)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(fmt(pos), color = sub, fontSize = 12.sp, fontFamily = lockFont(400))
-                Text(if (info.durationMs > 0L) fmt(info.durationMs) else "", color = sub, fontSize = 12.sp, fontFamily = lockFont(400))
+                Text(fmt(pos), color = sub, fontSize = 12.sp, fontFamily = UiFont)
+                Text(if (info.durationMs > 0L) fmt(info.durationMs) else "", color = sub, fontSize = 12.sp, fontFamily = UiFont)
             }
             Spacer(Modifier.height(6.dp))
             Row(
@@ -231,7 +231,7 @@ private fun PlayerBody(
             if (!info.appLabel.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    info.appLabel, color = sub, fontSize = 12.sp, fontFamily = lockFont(600),
+                    info.appLabel, color = sub, fontSize = 12.sp, fontFamily = UiFont,
                     textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
                 )
             }
