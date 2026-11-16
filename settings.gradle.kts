@@ -27,6 +27,9 @@ include(":launcher")
 // Parte 3
 include(":controlcenter")
 
+// Barra de status
+include(":statusbar")
+
 // Módulos planejados (entram nas próximas partes, um por vez):
 // include(":widgets")
 // include(":notifications")
