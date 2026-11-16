@@ -26,6 +26,7 @@ import com.pixelexperience.forall.lockscreen.data.ShortcutType
 import com.pixelexperience.forall.lockscreen.notifications.LockNotificationListener
 import com.pixelexperience.forall.lockscreen.notifications.LockNotificationRepository
 import com.pixelexperience.forall.lockscreen.system.TorchController
+import androidx.compose.foundation.isSystemInDarkTheme
 import com.pixelexperience.forall.lockscreen.ui.theme.LockTheme
 
 /**
@@ -67,9 +68,9 @@ class LockScreenActivity : ComponentActivity() {
         val repo = LockSettingsRepository.get(this)
 
         setContent {
-            LockTheme {
-                val settings by repo.settings.collectAsStateWithLifecycle()
-                val wallpaper = rememberWallpaper(settings.wallpaperId, settings.wallpaperVersion)
+            val settings by repo.settings.collectAsStateWithLifecycle()
+            val wallpaper = rememberWallpaper(settings.wallpaperId, settings.wallpaperVersion)
+            LockTheme(seed = wallpaper?.let { it.palette.seed }, dark = isSystemInDarkTheme()) {
                 val notifs by LockNotificationRepository.items.collectAsStateWithLifecycle()
                 val torch by TorchController.isOn.collectAsStateWithLifecycle()
                 LockScreenContent(
