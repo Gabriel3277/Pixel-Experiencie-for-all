@@ -45,6 +45,7 @@ dependencies {
     implementation(project(":launcher"))
     implementation(project(":controlcenter"))
 implementation(project(":lockscreen"))
+    implementation(project(":statusbar"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
