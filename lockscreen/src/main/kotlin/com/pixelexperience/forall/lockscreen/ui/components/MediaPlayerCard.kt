@@ -101,6 +101,8 @@ fun MediaPlayerCard(
     glass: Boolean,
     glassOpacity: Float,
     modifier: Modifier = Modifier,
+    subColor: Color? = null,
+    chipColor: Color? = null,
 ) {
     val info = media.info
     // guarda o último estado para a animação de saída ter o que desenhar
@@ -118,7 +120,7 @@ fun MediaPlayerCard(
         if (shown != null) {
             val shape = RoundedCornerShape(28.dp)
             val body: @Composable BoxScope.() -> Unit = {
-                PlayerBody(shown, media, expanded, { expanded = !expanded }, tint, onTint, accent, onAccent)
+                PlayerBody(shown, media, expanded, { expanded = !expanded }, tint, onTint, accent, onAccent, subColor, chipColor)
             }
             if (glass) {
                 GlassCard(modifier = Modifier.fillMaxWidth(), shape = shape, tint = tint, opacity = glassOpacity, content = body)
@@ -139,9 +141,11 @@ private fun PlayerBody(
     onTint: Color,
     accent: Color,
     onAccent: Color,
+    subColor: Color? = null,
+    chipColor: Color? = null,
 ) {
-    val sub = lerp(onTint, tint, 0.35f) // texto secundário: mistura opaca, sem alpha
-    val chip = lerp(tint, onTint, 0.12f)
+    val sub = subColor ?: lerp(onTint, tint, 0.35f) // texto secundário: mistura opaca, sem alpha
+    val chip = chipColor ?: lerp(tint, onTint, 0.12f)
     val coverSize by animateDpAsState(if (expanded) 88.dp else 64.dp, LockMotion.spatial(), label = "cover")
     val playCorner by animateDpAsState(if (info.playing) 16.dp else 28.dp, LockMotion.fastSpatial(), label = "playShape")
     val heartTint by animateColorAsState(if (info.favorite) accent else onTint, LockMotion.effects(), label = "heart")

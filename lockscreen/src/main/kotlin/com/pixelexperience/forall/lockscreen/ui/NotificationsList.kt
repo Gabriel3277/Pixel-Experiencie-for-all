@@ -40,6 +40,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -83,6 +84,7 @@ import com.pixelexperience.forall.lockscreen.notifications.LockNotification
 import com.pixelexperience.forall.lockscreen.ui.components.GlassCard
 import com.pixelexperience.forall.lockscreen.ui.theme.LockMotion
 import com.pixelexperience.forall.lockscreen.ui.theme.lockFont
+import com.pixelexperience.forall.lockscreen.ui.theme.lockColorScheme
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -111,11 +113,14 @@ private class Entry(
 )
 
 /** Cores sólidas e opacas dos cartões, derivadas do tom (surfaceContainerHigh) e do accent da lockscreen. */
-private class Pal(val tint: Color, val accent: Color) {
-    // texto = o proprio tom do cartao levado quase ao preto/branco (acompanha a paleta, contraste automatico)
-    val onCard: Color = if (tint.luminance() > 0.5f) lerp(tint, Color.Black, 0.88f) else lerp(tint, Color.White, 0.88f)
-    val stack1: Color = lerp(tint, Color.Black, 0.10f)
-    val stack2: Color = lerp(tint, Color.Black, 0.20f)
+private class Pal(val tint: Color, val accent: Color, sc: ColorScheme) {
+    private val dark = tint.luminance() <= 0.5f
+    val onCard: Color = sc.onSurface
+    val onCardVariant: Color = sc.onSurfaceVariant
+    val onAccent: Color = sc.onPrimary
+    val chip: Color = sc.surfaceContainerHighest
+    val stack1: Color = if (dark) sc.surfaceContainer else sc.surfaceContainerHighest
+    val stack2: Color = if (dark) sc.surfaceContainerLow else sc.surfaceDim
     fun card(priority: Boolean): Color = tint
 }
 
@@ -154,8 +159,11 @@ fun NotificationsList(
     modifier: Modifier = Modifier,
     onAction: (LockAction) -> Unit = {},
     glass: Boolean = false,
+    scheme: ColorScheme? = null,
 ) {
-    val pal = remember(tint, accent) { Pal(tint, accent) }
+    val pal = remember(tint, accent, scheme) {
+        Pal(tint, accent, scheme ?: lockColorScheme(accent, tint.luminance() <= 0.5f))
+    }
     var showQuiet by rememberSaveable { mutableStateOf(false) }
     val quiet = remember(items) { items.filter { it.importance < NotificationManager.IMPORTANCE_DEFAULT } }
     val quietApps = remember(quiet) { quiet.distinctBy { it.packageName } }
@@ -397,10 +405,10 @@ private fun NotificationCard(
     // cores sólidas: prioritária puxa o accent; os textos secundários são misturas opacas (sem alpha)
     val cardColor = pal.card(priority)
     val main = pal.onCard
-    val appNameColor = lerp(main, cardColor, 0.14f)
-    val timeColor = lerp(main, cardColor, 0.42f)
-    val bodyColor = lerp(main, cardColor, if (silent) 0.40f else 0.22f)
-    val chipColor = lerp(cardColor, main, 0.14f)
+    val appNameColor = pal.onCardVariant
+    val timeColor = pal.onCardVariant
+    val bodyColor = pal.onCardVariant
+    val chipColor = pal.chip
 
     SolidCard(
         modifier = modifier.fillMaxWidth().swipeAway(dismissible, onDismiss)
@@ -582,8 +590,9 @@ private fun relTime(ctx: Context, t: Long): String {
 
 @Composable
 private fun AppIcon(n: LockNotification, size: Dp, pal: Pal) {
-    val bg = if (n.color != 0) Color(n.color or 0xFF000000.toInt()) else pal.accent
-    val glyph = if (bg.luminance() > 0.55f) Color(0xFF1C1B1F) else Color.White
+    val brand = n.color != 0
+    val bg = if (brand) Color(n.color or 0xFF000000.toInt()) else pal.accent
+    val glyph = if (!brand) pal.onAccent else if (bg.luminance() > 0.55f) Color(0xFF1C1B1F) else Color.White
     Box(Modifier.size(size).clip(CircleShape).background(bg), contentAlignment = Alignment.Center) {
         val icon = n.icon
         if (icon != null) {

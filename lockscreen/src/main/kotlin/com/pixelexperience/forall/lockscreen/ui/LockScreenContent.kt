@@ -189,7 +189,7 @@ fun LockScreenContent(
     val palette = wallpaper?.palette ?: LockPalette.Default
     // Dynamic Color a partir do wallpaper: todos os papéis (clock, cards, atalhos) vêm do mesmo esquema tonal
     val dark = isSystemInDarkTheme()
-    val scheme = remember(palette.accent, dark) { lockColorScheme(palette.accent, dark) }
+    val scheme = remember(palette.seed, dark) { lockColorScheme(palette.seed, dark) }
     // relogio fica como estava: sempre o esquema escuro (nao muda com o tema)
     val clockScheme = remember(palette.accent) { lockColorScheme(palette.accent) }
     val clockTint = when (settings.clockColor) {
@@ -436,6 +436,8 @@ fun LockScreenContent(
                 Spacer(Modifier.height(16.dp))
                 MediaPlayerCard(
                     media = media,
+                    subColor = scheme.onSurfaceVariant,
+                    chipColor = scheme.surfaceContainerHighest,
                     tint = scheme.surfaceContainerHigh,
                     onTint = scheme.onSurface,
                     accent = scheme.primary,
@@ -447,6 +449,7 @@ fun LockScreenContent(
                 Box(Modifier.weight(1f).padding(horizontal = 12.dp).layerFx(e2::value, dragFn, 0.6f, 1.2f, distFn)) {
                     NotificationsList(
                         items = shown,
+                        scheme = scheme,
                         grouped = settings.groupNotifications,
                         glass = settings.glassNotifications,
                         opacity = settings.cardOpacity,
@@ -518,10 +521,10 @@ private fun ShortcutSlot(
             icon = type.icon(torchOn), description = type.label,
             active = type == ShortcutType.FLASHLIGHT && torchOn,
             accent = scheme.primary, onAccent = scheme.onPrimary,
-            // par tonal com contraste garantido: circulo claro + icone escuro (escuro) ou o inverso do esquema (claro)
-            tint = if (scheme.background.luminance() > 0.5f) scheme.primaryContainer else scheme.onPrimaryContainer,
+            // par tonal M3: secondaryContainer + onSecondaryContainer (contraste garantido pelo esquema)
+            tint = scheme.secondaryContainer,
             opacity = 1f,
-            iconColor = if (scheme.background.luminance() > 0.5f) scheme.onPrimaryContainer else scheme.primaryContainer,
+            iconColor = scheme.onSecondaryContainer,
             onClick = { onShortcut(type) },
         )
     }
