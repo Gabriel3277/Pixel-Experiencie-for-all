@@ -51,9 +51,11 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -64,6 +66,7 @@ import com.pixelexperience.forall.controlcenter.PanelState
 import com.pixelexperience.forall.controlcenter.R
 import kotlinx.coroutines.delay
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 // Componentes do painel da Central de controle (sliders, tiles e botões animados).
 @Composable
@@ -109,6 +112,7 @@ private fun ToggleBox(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val haptic = LocalHapticFeedback.current
 
     val pressScale by animateFloatAsState(
         targetValue = if (pressed) 0.92f else 1f,
@@ -172,7 +176,10 @@ private fun ToggleBox(
             interactionSource = interaction,
             indication = null,
             enabled = enabled,
-            onClick = onClick,
+            onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            },
         )
     }
 
@@ -231,8 +238,19 @@ internal fun PillSlider(
     hintColor: Color,
     @DrawableRes icon: Int? = null,
     iconTint: Color = Color.Unspecified,
+    showPercent: Boolean = false,
 ) {
     val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
+    var lastEdge by remember { mutableStateOf(-1) }
+
+    // Toque leve nas pontas (0% e 100%); o resto do arrasto fica silencioso.
+    fun emit(v: Float) {
+        val edge = if (v <= 0f) 0 else if (v >= 1f) 1 else -1
+        if (edge >= 0 && edge != lastEdge) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        lastEdge = edge
+        onValueChange(v)
+    }
     var widthPx by remember { mutableFloatStateOf(1f) }
     var tapPressed by remember { mutableStateOf(false) }
     var dragPressed by remember { mutableStateOf(false) }
@@ -274,7 +292,7 @@ internal fun PillSlider(
                             tryAwaitRelease()
                             tapPressed = false
                         },
-                        onTap = { offset -> onValueChange(fractionAt(offset.x)) },
+                        onTap = { offset -> emit(fractionAt(offset.x)) },
                     )
                 } else {
                     detectTapGestures { onDisabledClick() }
@@ -285,13 +303,14 @@ internal fun PillSlider(
                     detectHorizontalDragGestures(
                         onDragStart = { offset ->
                             dragPressed = true
-                            onValueChange(fractionAt(offset.x))
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            emit(fractionAt(offset.x))
                         },
                         onDragEnd = { dragPressed = false },
                         onDragCancel = { dragPressed = false },
                     ) { change, _ ->
                         change.consume()
-                        onValueChange(fractionAt(change.position.x))
+                        emit(fractionAt(change.position.x))
                     }
                 }
             },
@@ -349,6 +368,17 @@ internal fun PillSlider(
                         .size(24.dp),
                 )
             }
+            if (showPercent) {
+                Text(
+                    text = "${(shown * 100f).roundToInt()}%",
+                    color = hintColor,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 18.dp)
+                        .graphicsLayer { alpha = press },
+                )
+            }
         } else {
             Box(
                 modifier = Modifier
@@ -386,6 +416,7 @@ internal fun WideTile(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val haptic = LocalHapticFeedback.current
     val pressScale by animateFloatAsState(
         targetValue = if (pressed) 0.96f else 1f,
         animationSpec = spring(
@@ -407,7 +438,10 @@ internal fun WideTile(
             .clickable(
                 interactionSource = interaction,
                 indication = null,
-                onClick = onClick,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onClick()
+                },
             )
             .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,

@@ -1,10 +1,13 @@
 package com.pixelexperience.forall.controlcenter.ui
 
 import android.text.format.DateFormat
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -36,7 +39,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -224,8 +229,6 @@ internal fun NotifCard(
     val offset = remember { Animatable(0f) }
     var width by remember { mutableFloatStateOf(1f) }
     val fade = 1f - (abs(offset.value) / width).coerceIn(0f, 1f)
-    val time = remember(item.whenMs) { DateFormat.getTimeFormat(context).format(Date(item.whenMs)) }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -236,7 +239,6 @@ internal fun NotifCard(
             }
             .clip(RoundedCornerShape(24.dp))
             .background(c.tileOff)
-            .clickable(onClick = onOpen)
             .then(
                 if (item.clearable) {
                     Modifier.pointerInput(Unit) {
@@ -265,35 +267,66 @@ internal fun NotifCard(
                 } else {
                     Modifier
                 },
-            )
+            ),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        NotifBody(item, c, onOpen, Modifier.weight(1f))
+    }
+}
+
+/**
+ * Conteúdo do cartão (ícone, app · hora, título e texto). Toca para abrir o app;
+ * o chevron expande e recolhe textos longos. Reutilizado pelo cartão simples e pela
+ * lista segmentada dos grupos abertos.
+ */
+@Composable
+internal fun NotifBody(
+    item: NotifItem,
+    c: PanelColors,
+    onOpen: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val time = remember(item.whenMs) { DateFormat.getTimeFormat(context).format(Date(item.whenMs)) }
+    var expanded by remember { mutableStateOf(false) }
+    val longText = item.text.length > 90 || item.text.contains('\n')
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen)
             .padding(14.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        val accent = if (item.color != 0) Color(item.color).copy(alpha = 1f) else c.tileOn
         Box(
             modifier = Modifier
                 .size(36.dp)
                 .clip(CircleShape)
-                .background(accent),
+                .background(c.tileOn),
             contentAlignment = Alignment.Center,
         ) {
             if (item.icon != null) {
                 Icon(
                     bitmap = item.icon,
                     contentDescription = null,
-                    tint = Color.White,
+                    tint = c.onTileOn,
                     modifier = Modifier.size(20.dp),
                 )
             } else {
                 Text(
                     text = item.appName.take(1).uppercase(),
-                    color = Color.White,
+                    color = c.onTileOn,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
                 )
             }
         }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .animateContentSize(spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
             Text(
                 text = "${item.appName} · $time",
                 color = c.onTileOff.copy(alpha = 0.7f),
@@ -307,7 +340,7 @@ internal fun NotifCard(
                     color = c.onTileOff,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
-                    maxLines = 1,
+                    maxLines = if (expanded) 3 else 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -316,9 +349,44 @@ internal fun NotifCard(
                     text = item.text,
                     color = c.onTileOff.copy(alpha = 0.85f),
                     fontSize = 13.sp,
-                    maxLines = 3,
+                    maxLines = if (expanded) Int.MAX_VALUE else 3,
                     overflow = TextOverflow.Ellipsis,
                 )
+            }
+        }
+        if (longText) {
+            val turn by animateFloatAsState(
+                targetValue = if (expanded) 180f else 0f,
+                animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+                label = "chevron",
+            )
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(c.onTileOff.copy(alpha = 0.10f))
+                    .clickable { expanded = !expanded },
+                contentAlignment = Alignment.Center,
+            ) {
+                Canvas(modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = turn }) {
+                    val w = size.width
+                    val h = size.height
+                    val stroke = 2f.dp.toPx()
+                    drawLine(
+                        color = c.onTileOff,
+                        start = Offset(w * 0.2f, h * 0.35f),
+                        end = Offset(w * 0.5f, h * 0.65f),
+                        strokeWidth = stroke,
+                        cap = StrokeCap.Round,
+                    )
+                    drawLine(
+                        color = c.onTileOff,
+                        start = Offset(w * 0.5f, h * 0.65f),
+                        end = Offset(w * 0.8f, h * 0.35f),
+                        strokeWidth = stroke,
+                        cap = StrokeCap.Round,
+                    )
+                }
             }
         }
     }

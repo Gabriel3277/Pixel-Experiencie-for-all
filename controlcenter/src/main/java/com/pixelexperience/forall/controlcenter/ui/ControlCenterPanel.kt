@@ -215,6 +215,7 @@ internal fun ControlCard(
                         hintColor = c.onTileOff,
                         icon = R.drawable.cc_ic_brightness,
                         iconTint = c.onTileOn,
+                        showPercent = true,
                     )
                     CircleButton(
                         icon = R.drawable.cc_ic_brightness_auto,

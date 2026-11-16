@@ -308,10 +308,17 @@ private fun NotifGroup(
                 GroupPill("Mostrar tudo (${list.size})", c, onToggle)
             }
         } else {
-            list.forEach { item ->
-                key(item.key) {
-                    NotifCard(item, c, { onOpen(item) }, { onDismissItem(item) })
-                }
+            SegmentedSwipeList(
+                items = list,
+                itemKey = { it.key },
+                onDismiss = onDismissItem,
+                canDismiss = { it.clearable },
+                containerColor = c.tileOff,
+                contentColor = c.onTileOff,
+                outerRadius = 24.dp,
+                innerRadius = 6.dp,
+            ) { item ->
+                NotifBody(item, c, { onOpen(item) })
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
