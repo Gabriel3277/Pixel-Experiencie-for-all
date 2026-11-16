@@ -1,13 +1,19 @@
 package com.pixelexperience.forall.statusbar
 
+import android.Manifest
 import android.app.NotificationManager
 import android.app.WallpaperColors
 import android.app.WallpaperManager
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.net.ConnectivityManager
 import android.net.Network
@@ -35,6 +41,7 @@ internal data class StatusBarState(
     val vpn: Boolean = false,
     val ringerMode: Int = AudioManager.RINGER_MODE_NORMAL,
     val dnd: Boolean = false,
+    val bluetooth: Boolean = false,
     val signalLevel: Int = 0,
     val wifi: Boolean = false,
     val wifiLevel: Int = 0,
@@ -70,6 +77,7 @@ internal class StatusBarMonitor(context: Context) {
     private val power = ctx.getSystemService(PowerManager::class.java)
     private val telephony = ctx.getSystemService(TelephonyManager::class.java)
     private val wallpaper = ctx.getSystemService(WallpaperManager::class.java)
+    private val bluetoothManager = ctx.getSystemService(BluetoothManager::class.java)
 
     var state by mutableStateOf(StatusBarState())
         private set
@@ -100,6 +108,10 @@ internal class StatusBarMonitor(context: Context) {
                     update { it.copy(ringerMode = audio.ringerMode) }
                 NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED ->
                     update { it.copy(dnd = isDnd()) }
+                BluetoothAdapter.ACTION_STATE_CHANGED,
+                BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED,
+                BluetoothDevice.ACTION_ACL_CONNECTED,
+                BluetoothDevice.ACTION_ACL_DISCONNECTED -> refreshBluetooth()
                 WifiManager.RSSI_CHANGED_ACTION,
                 WifiManager.NETWORK_STATE_CHANGED_ACTION -> refreshWifi()
                 else -> update { it.copy(time = formatTime()) }
@@ -161,6 +173,7 @@ internal class StatusBarMonitor(context: Context) {
         }
         loadPrefs()
         readWallpaper()
+        refreshBluetooth()
         StatusBarPrefs.prefs(ctx).registerOnSharedPreferenceChangeListener(prefsListener)
         runCatching { wallpaper.addOnColorsChangedListener(wallpaperListener, main) }
 
@@ -171,6 +184,10 @@ internal class StatusBarMonitor(context: Context) {
             addAction(NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED)
             addAction(WifiManager.RSSI_CHANGED_ACTION)
             addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION)
+            addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+            addAction(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED)
+            addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+            addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
             addAction(Intent.ACTION_TIME_TICK)
             addAction(Intent.ACTION_TIME_CHANGED)
             addAction(Intent.ACTION_TIMEZONE_CHANGED)
@@ -206,7 +223,29 @@ internal class StatusBarMonitor(context: Context) {
         StatusBarPrefs.prefs(ctx).unregisterOnSharedPreferenceChangeListener(prefsListener)
     }
 
+    /**
+     * Com a permissão BLUETOOTH_CONNECT mostra só quando há dispositivo conectado.
+     * Sem ela, o sistema não deixa ver conexões: mostra enquanto o Bluetooth estiver ligado.
+     */
+    private fun refreshBluetooth() {
+        val adapter = bluetoothManager?.adapter
+        val enabled = runCatching { adapter?.isEnabled == true }.getOrDefault(false)
+        val granted = ContextCompat.checkSelfPermission(
+            ctx, Manifest.permission.BLUETOOTH_CONNECT
+        ) == PackageManager.PERMISSION_GRANTED
+        val visible = when {
+            !enabled || adapter == null -> false
+            !granted -> true
+            else -> runCatching {
+                listOf(BluetoothProfile.HEADSET, BluetoothProfile.A2DP, BluetoothProfile.GATT)
+                    .any { adapter.getProfileConnectionState(it) == BluetoothProfile.STATE_CONNECTED }
+            }.getOrDefault(false)
+        }
+        update { it.copy(bluetooth = visible) }
+    }
+
     private fun loadPrefs() {
+        refreshBluetooth()
         update {
             it.copy(
                 showMute = StatusBarPrefs.bool(ctx, StatusBarPrefs.SHOW_MUTE, true),

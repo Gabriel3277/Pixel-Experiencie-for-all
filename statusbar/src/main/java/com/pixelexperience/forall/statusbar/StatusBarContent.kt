@@ -49,6 +49,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -93,8 +94,13 @@ internal fun StatusBarContent(s: StatusBarState) {
             color = fg,
             style = TextStyle(
                 fontFamily = clockFont,
-                fontSize = 16.sp,
+                fontSize = 17.sp,
                 fontWeight = FontWeight.Normal,
+                lineHeight = 20.sp,
+                lineHeightStyle = LineHeightStyle(
+                    LineHeightStyle.Alignment.Center,
+                    LineHeightStyle.Trim.Both
+                ),
                 letterSpacing = 0.sp,
                 fontFeatureSettings = "tnum",
                 shadow = shadow
@@ -129,8 +135,9 @@ internal fun StatusBarContent(s: StatusBarState) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Slot(s.vpn) { KeyIcon(fg) }
+            Slot(s.bluetooth) { BluetoothIcon(fg) }
             Slot(s.dnd) { DndIcon(fg) }
-            Slot(s.ringerMode == AudioManager.RINGER_MODE_SILENT && s.showMute) { BellOffIcon(fg) }
+            Slot(s.ringerMode == AudioManager.RINGER_MODE_SILENT && s.showMute) { SpeakerOffIcon(fg) }
             Slot(s.ringerMode == AudioManager.RINGER_MODE_VIBRATE && s.showVibrate) { VibrateIcon(fg) }
             Slot(true) { SignalIcon(s.signalLevel, fg) }
             Slot(s.wifi) { WifiIcon(s.wifiLevel, fg) }
@@ -156,12 +163,12 @@ private fun SignalIcon(level: Int, color: Color) {
     val alphas = List(4) { i ->
         animateFloatAsState(if (i < level) 1f else 0.3f, tween(200), label = "sig$i").value
     }
-    Canvas(Modifier.size(width = 15.dp, height = 12.dp)) {
-        val bars = 4
-        val gap = size.width * 0.1f
-        val bw = (size.width - gap * (bars - 1)) / bars
-        for (i in 0 until bars) {
-            val h = size.height * (0.4f + 0.6f * i / (bars - 1))
+    Canvas(Modifier.size(width = 16.5.dp, height = 14.dp)) {
+        val gap = 1.4.dp.toPx()
+        val bw = (size.width - gap * 3) / 4
+        val fracs = floatArrayOf(0.32f, 0.55f, 0.77f, 1f)
+        for (i in 0 until 4) {
+            val h = size.height * fracs[i]
             drawRoundRect(
                 color = color.copy(alpha = alphas[i]),
                 topLeft = Offset(i * (bw + gap), size.height - h),
@@ -172,61 +179,80 @@ private fun SignalIcon(level: Int, color: Color) {
     }
 }
 
-/** Wi-Fi estilo Pixel: leque de 4 faixas separadas por vãos finos; o sinal acende de dentro para fora. */
+/** Wi-Fi estilo Pixel: ponto + 2 arcos grossos de pontas redondas; o sinal acende de dentro para fora. */
 @Composable
 private fun WifiIcon(level: Int, color: Color) {
-    val active = level.coerceIn(1, 4)
-    val alphas = List(4) { i ->
-        animateFloatAsState(if (i < active) 1f else 0.3f, tween(250), label = "wifi$i").value
-    }
-    Canvas(Modifier.size(width = 18.dp, height = 14.dp)) {
-        val half = 50f
+    val dotA by animateFloatAsState(1f, tween(250), label = "wifiDot")
+    val innerA by animateFloatAsState(if (level >= 2) 1f else 0.3f, tween(250), label = "wifiIn")
+    val outerA by animateFloatAsState(if (level >= 3) 1f else 0.3f, tween(250), label = "wifiOut")
+    Canvas(Modifier.size(width = 19.dp, height = 14.dp)) {
+        val sw = 2.3.dp.toPx()
+        val dotR = 1.7.dp.toPx()
         val cx = size.width / 2
-        val cy = size.height - 1.dp.toPx()
-        val outer = minOf(size.width / 1.6f, cy - 0.7.dp.toPx())
-        val gap = 1.3.dp.toPx()
-        val fracs = floatArrayOf(0.30f, 0.55f, 0.78f, 1f)
-        val round = Stroke(width = 1.dp.toPx(), join = StrokeJoin.Round, cap = StrokeCap.Round)
-        for (i in 0 until 4) {
-            val rOut = outer * fracs[i]
-            val rIn = if (i == 0) 0f else outer * fracs[i - 1] + gap
-            val band = bandPath(cx, cy, rIn, rOut, -90f - half, half * 2)
-            drawPath(band, color.copy(alpha = alphas[i]))
-            drawPath(band, color.copy(alpha = alphas[i]), style = round)
+        val cy = size.height - dotR - 0.2.dp.toPx()
+        drawCircle(color.copy(alpha = dotA), radius = dotR, center = Offset(cx, cy))
+        val arcs = listOf(5.6.dp.toPx() to innerA, 10.dp.toPx() to outerA)
+        for ((r, a) in arcs) {
+            drawArc(
+                color = color.copy(alpha = a),
+                startAngle = -145f,
+                sweepAngle = 110f,
+                useCenter = false,
+                topLeft = Offset(cx - r, cy - r),
+                size = Size(r * 2, r * 2),
+                style = Stroke(width = sw, cap = StrokeCap.Round)
+            )
         }
     }
 }
 
-private fun bandPath(cx: Float, cy: Float, rIn: Float, rOut: Float, start: Float, sweep: Float): Path {
-    fun box(r: Float) = Rect(Offset(cx - r, cy - r), Size(r * 2, r * 2))
-    return Path().apply {
-        if (rIn <= 0f) {
-            moveTo(cx, cy)
-            arcTo(box(rOut), start, sweep, false)
-        } else {
-            arcTo(box(rOut), start, sweep, true)
-            arcTo(box(rIn), start + sweep, -sweep, false)
+/** Alto-falante cortado (silencioso), como no Pixel. */
+@Composable
+private fun SpeakerOffIcon(color: Color) {
+    Canvas(Modifier.size(width = 14.dp, height = 13.dp)) {
+        val w = size.width
+        val h = size.height
+        val body = Path().apply {
+            moveTo(w * 0.06f, h * 0.38f)
+            lineTo(w * 0.26f, h * 0.38f)
+            lineTo(w * 0.48f, h * 0.18f)
+            lineTo(w * 0.48f, h * 0.82f)
+            lineTo(w * 0.26f, h * 0.62f)
+            lineTo(w * 0.06f, h * 0.62f)
+            close()
         }
-        close()
+        drawPath(body, color)
+        drawPath(body, color, style = Stroke(width = w * 0.06f, join = StrokeJoin.Round))
+        drawArc(
+            color = color,
+            startAngle = -45f,
+            sweepAngle = 90f,
+            useCenter = false,
+            topLeft = Offset(w * 0.46f - w * 0.3f, h * 0.5f - w * 0.3f),
+            size = Size(w * 0.6f, w * 0.6f),
+            style = Stroke(width = w * 0.11f, cap = StrokeCap.Round)
+        )
+        drawLine(color, Offset(w * 0.08f, h * 0.08f), Offset(w * 0.94f, h * 0.94f), w * 0.12f, StrokeCap.Round)
     }
 }
 
 @Composable
-private fun BellOffIcon(color: Color) {
-    Canvas(Modifier.size(12.dp)) {
+private fun BluetoothIcon(color: Color) {
+    Canvas(Modifier.size(width = 9.dp, height = 13.dp)) {
         val w = size.width
         val h = size.height
-        val sw = w * 0.13f
-        val bell = Path().apply {
-            moveTo(w * 0.18f, h * 0.74f)
-            lineTo(w * 0.18f, h * 0.44f)
-            cubicTo(w * 0.18f, h * 0.12f, w * 0.82f, h * 0.12f, w * 0.82f, h * 0.44f)
-            lineTo(w * 0.82f, h * 0.74f)
-            close()
+        val rune = Path().apply {
+            moveTo(w * 0.12f, h * 0.3f)
+            lineTo(w * 0.82f, h * 0.72f)
+            lineTo(w * 0.48f, h * 0.96f)
+            lineTo(w * 0.48f, h * 0.04f)
+            lineTo(w * 0.82f, h * 0.28f)
+            lineTo(w * 0.12f, h * 0.7f)
         }
-        drawPath(bell, color, style = Stroke(width = sw, join = StrokeJoin.Round))
-        drawCircle(color, radius = w * 0.1f, center = Offset(w * 0.5f, h * 0.9f))
-        drawLine(color, Offset(w * 0.04f, h * 0.06f), Offset(w * 0.96f, h * 0.96f), sw, StrokeCap.Round)
+        drawPath(
+            rune, color,
+            style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
     }
 }
 
@@ -263,16 +289,16 @@ private fun KeyIcon(color: Color) {
     Canvas(Modifier.size(width = 15.dp, height = 10.dp)) {
         val w = size.width
         val h = size.height
-        val sw = h * 0.2f
+        val sw = h * 0.22f
         val r = h * 0.3f
         drawCircle(color, radius = r, center = Offset(r + sw / 2, h / 2), style = Stroke(width = sw))
         drawLine(color, Offset(2 * r + sw, h / 2), Offset(w - sw / 2, h / 2), sw, StrokeCap.Round)
-        drawLine(color, Offset(w * 0.7f, h / 2), Offset(w * 0.7f, h * 0.88f), sw, StrokeCap.Round)
-        drawLine(color, Offset(w - sw / 2, h / 2), Offset(w - sw / 2, h * 0.88f), sw, StrokeCap.Round)
+        drawLine(color, Offset(w * 0.68f, h / 2), Offset(w * 0.68f, h * 0.9f), sw, StrokeCap.Round)
+        drawLine(color, Offset(w - sw / 2, h / 2), Offset(w - sw / 2, h * 0.9f), sw, StrokeCap.Round)
     }
 }
 
-/** Bateria estilo Pixel: corpo arredondado com terminal, número dentro, raio ao carregar. */
+/** Bateria estilo Pixel: corpo arredondado, parte vazia cinza, número escuro dentro e terminal à direita. */
 @Composable
 private fun BatteryPill(s: StatusBarState) {
     val dark = s.darkIcons
@@ -298,14 +324,14 @@ private fun BatteryPill(s: StatusBarState) {
     val showText = s.showBatteryPct
     val charging = s.charging
 
-    Canvas(Modifier.size(width = 32.dp, height = 15.dp)) {
+    Canvas(Modifier.size(width = 31.dp, height = 15.dp)) {
         val h = size.height
-        val nubW = 2.2.dp.toPx()
+        val nubW = 1.8.dp.toPx()
         val nubH = 6.dp.toPx()
-        val bodyW = size.width - nubW - 0.8.dp.toPx()
-        val track = base.copy(alpha = 0.32f)
+        val bodyW = size.width - nubW - 1.2.dp.toPx()
+        val track = base.copy(alpha = 0.35f)
 
-        val body = Path().apply { addRoundRect(RoundRect(0f, 0f, bodyW, h, CornerRadius(h * 0.36f))) }
+        val body = Path().apply { addRoundRect(RoundRect(0f, 0f, bodyW, h, CornerRadius(h * 0.3f))) }
         drawPath(body, track)
         drawRoundRect(
             color = if (pct > 0.97f) fill else track,
@@ -319,8 +345,9 @@ private fun BatteryPill(s: StatusBarState) {
         clipRect(0f, 0f, fw, h) {
             drawBatteryGlyphs(paint, label, showText, charging, textOnFill, bodyW)
         }
+        // Na parte vazia (cinza) o número é sempre escuro, como no Pixel.
         clipRect(fw, 0f, bodyW, h) {
-            drawBatteryGlyphs(paint, label, showText, charging, base, bodyW)
+            drawBatteryGlyphs(paint, label, showText, charging, DarkInk, bodyW)
         }
     }
 }
@@ -354,7 +381,7 @@ private fun DrawScope.drawBatteryGlyphs(
     }
 
     if (showText) {
-        paint.textSize = 11.sp.toPx()
+        paint.textSize = 12.5.sp.toPx()
         paint.color = color.toArgb()
         val y = h / 2 - (paint.ascent() + paint.descent()) / 2
         drawIntoCanvas { it.nativeCanvas.drawText(label, textCenter, y, paint) }

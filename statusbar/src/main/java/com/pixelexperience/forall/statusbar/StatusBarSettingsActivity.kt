@@ -1,11 +1,15 @@
 package com.pixelexperience.forall.statusbar
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -45,13 +49,24 @@ class StatusBarSettingsActivity : ComponentActivity() {
     private var refresh by mutableIntStateOf(0)
     private var pendingEnable = false
 
+    private val bluetoothPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+            // Muda um valor para o serviço reler o estado do Bluetooth.
+            StatusBarPrefs.setInt(this, "bt_refresh", (System.currentTimeMillis() % 100000).toInt())
+            refresh++
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             val ctx = LocalContext.current
             val colors = if (isSystemInDarkTheme()) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
             MaterialTheme(colorScheme = colors) {
-                SettingsScreen(refresh = refresh, onToggleEnabled = ::onToggleEnabled)
+                SettingsScreen(
+                    refresh = refresh,
+                    onToggleEnabled = ::onToggleEnabled,
+                    onRequestBluetooth = { bluetoothPermission.launch(Manifest.permission.BLUETOOTH_CONNECT) }
+                )
             }
         }
     }
@@ -85,10 +100,18 @@ class StatusBarSettingsActivity : ComponentActivity() {
 }
 
 @Composable
-private fun SettingsScreen(refresh: Int, onToggleEnabled: (Boolean) -> Unit) {
+private fun SettingsScreen(
+    refresh: Int,
+    onToggleEnabled: (Boolean) -> Unit,
+    onRequestBluetooth: () -> Unit
+) {
     val ctx = LocalContext.current
     val enabled = remember(refresh) { StatusBarPrefs.bool(ctx, StatusBarPrefs.ENABLED, false) }
     val hasAccess = remember(refresh) { StatusBar.hasNotificationAccess(ctx) }
+    val hasBluetooth = remember(refresh) {
+        ContextCompat.checkSelfPermission(ctx, Manifest.permission.BLUETOOTH_CONNECT) ==
+            PackageManager.PERMISSION_GRANTED
+    }
     var mute by remember(refresh) { mutableStateOf(StatusBarPrefs.bool(ctx, StatusBarPrefs.SHOW_MUTE, true)) }
     var vibrate by remember(refresh) { mutableStateOf(StatusBarPrefs.bool(ctx, StatusBarPrefs.SHOW_VIBRATE, true)) }
     var pct by remember(refresh) { mutableStateOf(StatusBarPrefs.bool(ctx, StatusBarPrefs.SHOW_BATTERY_PCT, true)) }
@@ -144,6 +167,14 @@ private fun SettingsScreen(refresh: Int, onToggleEnabled: (Boolean) -> Unit) {
         }
         SwitchRow("Porcentagem da bateria", "Mostrar o nível dentro da pílula", pct) {
             pct = it; StatusBarPrefs.set(ctx, StatusBarPrefs.SHOW_BATTERY_PCT, it)
+        }
+
+        ActionRow(
+            title = "Bluetooth",
+            subtitle = if (hasBluetooth) "Mostra o ícone quando há dispositivo conectado"
+            else "Toque para permitir e mostrar só quando conectado"
+        ) {
+            if (!hasBluetooth) onRequestBluetooth()
         }
 
         SectionTitle("Cor dos ícones")
