@@ -1,6 +1,8 @@
 package com.pixelexperience.forall.statusbar
 
 import android.app.NotificationManager
+import android.app.WallpaperColors
+import android.app.WallpaperManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -42,8 +44,18 @@ internal data class StatusBarState(
     val showMute: Boolean = true,
     val showVibrate: Boolean = true,
     val showBatteryPct: Boolean = true,
-    val darkIcons: Boolean = false
-)
+    val notifMode: Int = 0,
+    val iconMode: Int = 0,
+    val wallpaperLight: Boolean = false
+) {
+    /** Ícones escuros: manual (modo 2) ou, no automático, quando o papel de parede é claro. */
+    val darkIcons: Boolean
+        get() = when (iconMode) {
+            1 -> false
+            2 -> true
+            else -> wallpaperLight
+        }
+}
 
 /** Lê dados reais do sistema e os expõe como estado do Compose. */
 internal class StatusBarMonitor(context: Context) {
@@ -57,6 +69,7 @@ internal class StatusBarMonitor(context: Context) {
     private val nm = ctx.getSystemService(NotificationManager::class.java)
     private val power = ctx.getSystemService(PowerManager::class.java)
     private val telephony = ctx.getSystemService(TelephonyManager::class.java)
+    private val wallpaper = ctx.getSystemService(WallpaperManager::class.java)
 
     var state by mutableStateOf(StatusBarState())
         private set
@@ -127,6 +140,9 @@ internal class StatusBarMonitor(context: Context) {
         }
     }
 
+    private val wallpaperListener =
+        WallpaperManager.OnColorsChangedListener { _, _ -> readWallpaper() }
+
     // Precisa ficar guardado em propriedade: o SharedPreferences só guarda referência fraca.
     private val prefsListener =
         SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> loadPrefs() }
@@ -144,7 +160,9 @@ internal class StatusBarMonitor(context: Context) {
             )
         }
         loadPrefs()
+        readWallpaper()
         StatusBarPrefs.prefs(ctx).registerOnSharedPreferenceChangeListener(prefsListener)
+        runCatching { wallpaper.addOnColorsChangedListener(wallpaperListener, main) }
 
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_BATTERY_CHANGED)
@@ -184,6 +202,7 @@ internal class StatusBarMonitor(context: Context) {
         runCatching { cm.unregisterNetworkCallback(defaultCallback) }
         runCatching { cm.unregisterNetworkCallback(vpnCallback) }
         runCatching { telephony.unregisterTelephonyCallback(telephonyCallback) }
+        runCatching { wallpaper.removeOnColorsChangedListener(wallpaperListener) }
         StatusBarPrefs.prefs(ctx).unregisterOnSharedPreferenceChangeListener(prefsListener)
     }
 
@@ -193,9 +212,18 @@ internal class StatusBarMonitor(context: Context) {
                 showMute = StatusBarPrefs.bool(ctx, StatusBarPrefs.SHOW_MUTE, true),
                 showVibrate = StatusBarPrefs.bool(ctx, StatusBarPrefs.SHOW_VIBRATE, true),
                 showBatteryPct = StatusBarPrefs.bool(ctx, StatusBarPrefs.SHOW_BATTERY_PCT, true),
-                darkIcons = StatusBarPrefs.bool(ctx, StatusBarPrefs.DARK_ICONS, false)
+                notifMode = StatusBarPrefs.int(ctx, StatusBarPrefs.NOTIF_MODE, 0),
+                iconMode = StatusBarPrefs.iconMode(ctx)
             )
         }
+    }
+
+    private fun readWallpaper() {
+        val colors = runCatching { wallpaper.getWallpaperColors(WallpaperManager.FLAG_SYSTEM) }
+            .getOrNull()
+        val light = colors != null &&
+            (colors.colorHints and WallpaperColors.HINT_SUPPORTS_DARK_TEXT) != 0
+        update { it.copy(wallpaperLight = light) }
     }
 
     private fun readBattery(intent: Intent) {
