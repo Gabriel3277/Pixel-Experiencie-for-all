@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PowerSettingsNew
@@ -86,6 +87,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -186,6 +190,7 @@ fun LockSettingsScreen(onBack: () -> Unit) {
                         listOf(
                             Cat(Icons.Filled.Notifications, P_ORANGE, "Notificações", "Cards, agrupamento e privacidade", "Notificações"),
                             Cat(Icons.Filled.Apps, P_PINK, "Atalhos inferiores", s.leftShortcut.label + " · " + s.rightShortcut.label, "Atalhos inferiores"),
+                            Cat(Icons.Filled.Bedtime, P_BLUE, "Always-On", if (s.aodEnabled) "Ativado" else "Desativado", "Always-On"),
                         ),
                     ) { page = it }
                 }
@@ -291,6 +296,15 @@ fun LockSettingsScreen(onBack: () -> Unit) {
                     )
                 }
                 }
+                "Always-On" -> {
+                Section("Always-On") {
+                    SwitchRow("Always-On Display", s.aodEnabled) { v -> set { it.copy(aodEnabled = v) } }
+                    Text(
+                        "Entra após 17 s sem tocar na tela de bloqueio ou com toque duplo. Fundo preto, brilho mínimo e 20 s de duração; toque para voltar. Em telas LCD a luz de fundo continua acesa.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                }
                 "Atalhos inferiores" -> {
                 Section("Atalhos inferiores") {
                     Text("Esquerda", style = MaterialTheme.typography.labelLarge)
@@ -313,19 +327,17 @@ private fun PhonePreview(s: LockSettings, wallpaper: WallpaperUi?, demo: List<Lo
     val h = 300.dp
     val scale = h / vh
     val shape = RoundedCornerShape(26.dp)
+    val dens = LocalDensity.current
     BoxWithConstraints(Modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
         Box(Modifier.size(vw * scale, h).clip(shape).border(2.dp, Color.White.copy(alpha = 0.2f), shape).background(Color.Black)) {
-            Box(
-                Modifier.requiredSize(vw, vh).align(Alignment.TopStart).graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                    transformOrigin = TransformOrigin(0f, 0f)
+            // escala a densidade em vez de usar graphicsLayer: o conteúdo é medido e desenhado no tamanho real
+            CompositionLocalProvider(LocalDensity provides Density(dens.density * scale, dens.fontScale)) {
+                Box(Modifier.requiredSize(vw, vh).align(Alignment.TopStart)) {
+                    LockScreenContent(
+                        settings = s, wallpaper = wallpaper, notifications = demo, torchOn = false,
+                        preview = true, previewScale = 1f,
+                    )
                 }
-            ) {
-                LockScreenContent(
-                    settings = s, wallpaper = wallpaper, notifications = demo, torchOn = false,
-                    preview = true, previewScale = scale,
-                )
             }
         }
     }

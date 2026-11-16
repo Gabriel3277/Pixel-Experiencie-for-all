@@ -32,6 +32,10 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
+import android.os.SystemClock
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.view.WindowManager
 import com.pixelexperience.forall.lockscreen.data.LockPalette
 import com.pixelexperience.forall.lockscreen.ui.aod.AodContent
@@ -58,6 +62,37 @@ class LockScreenActivity : ComponentActivity() {
     private val handler = Handler(Looper.getMainLooper())
     // fim da janela do AOD: só solta a tela; o timeout do sistema apaga (o conteúdo continua preto)
     private val endAod = Runnable { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    private val idle = Runnable {
+        val pm = getSystemService(PowerManager::class.java)
+        if (!aod.value && pm.isInteractive && LockSettingsRepository.get(this).settings.value.aodEnabled) applyAod(true)
+    }
+    private val screenOn = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = armIdle()
+    }
+    private var modeAt = 0L
+    private val doubleTap by lazy {
+        GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                // ignora o 2º toque de quem acabou de sair do AOD
+                if (!aod.value && SystemClock.uptimeMillis() - modeAt > 800 &&
+                    LockSettingsRepository.get(this@LockScreenActivity).settings.value.aodEnabled
+                ) applyAod(true)
+                return false
+            }
+        })
+    }
+
+    private fun armIdle() {
+        handler.removeCallbacks(idle)
+        if (!aod.value) handler.postDelayed(idle, IDLE_MS)
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        doubleTap.onTouchEvent(ev)
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) armIdle()
+        return super.dispatchTouchEvent(ev)
+    }
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,6 +112,9 @@ class LockScreenActivity : ComponentActivity() {
         // se o usuário desbloquear por outro meio (digital/rosto no keyguard), fecha junto
         ContextCompat.registerReceiver(
             this, userPresent, IntentFilter(Intent.ACTION_USER_PRESENT), ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        ContextCompat.registerReceiver(
+            this, screenOn, IntentFilter(Intent.ACTION_SCREEN_ON), ContextCompat.RECEIVER_NOT_EXPORTED
         )
         val repo = LockSettingsRepository.get(this)
 
@@ -125,6 +163,8 @@ class LockScreenActivity : ComponentActivity() {
     /** AOD em LCD: tela acesa em brilho mínimo por AOD_WINDOW_MS; depois libera e o timeout do sistema apaga. */
     private fun applyAod(on: Boolean) {
         handler.removeCallbacks(endAod)
+        handler.removeCallbacks(idle)
+        modeAt = SystemClock.uptimeMillis()
         aod.value = on
         if (on) {
             setTurnScreenOn(true)
@@ -135,12 +175,14 @@ class LockScreenActivity : ComponentActivity() {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             window.attributes = window.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
             setTurnScreenOn(false)
+            armIdle()
         }
     }
 
     companion object {
         const val EXTRA_AOD = "pxe_aod"
         private const val AOD_WINDOW_MS = 20_000L
+        private const val IDLE_MS = 17_000L
     }
 
     override fun onResume() {
@@ -202,6 +244,8 @@ class LockScreenActivity : ComponentActivity() {
 
     override fun onDestroy() {
         handler.removeCallbacks(endAod)
+        handler.removeCallbacks(idle)
+        runCatching { unregisterReceiver(screenOn) }
         runCatching { unregisterReceiver(userPresent) }
         TorchController.unregister(this)
         super.onDestroy()

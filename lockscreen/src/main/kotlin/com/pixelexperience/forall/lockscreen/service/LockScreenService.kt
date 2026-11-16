@@ -38,9 +38,7 @@ class LockScreenService : Service() {
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == Intent.ACTION_SCREEN_OFF) {
-                // o SCREEN_OFF que encerra um AOD não abre outro (senão a tela nunca apagaria)
-                val aod = LockSettingsRepository.get(context).settings.value.aodEnabled && !AodState.screenIsAod
-                showLock(aod)
+                showLock(false) // o AOD agora só entra por 17 s sem toque ou toque duplo (LockScreenActivity)
             }
         }
     }
