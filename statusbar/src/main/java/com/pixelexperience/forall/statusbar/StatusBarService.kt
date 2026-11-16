@@ -16,8 +16,8 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.ui.platform.ComposeView
-import androidx.lifecycle.ViewTreeLifecycleOwner
-import androidx.savedstate.ViewTreeSavedStateRegistryOwner
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 
 internal class StatusBarService : Service() {
 
@@ -66,8 +66,8 @@ internal class StatusBarService : Service() {
         val o = OverlayOwner()
         val m = StatusBarMonitor(this)
         val v = ComposeView(this).apply {
-            ViewTreeLifecycleOwner.set(this, o)
-            ViewTreeSavedStateRegistryOwner.set(this, o)
+            setViewTreeLifecycleOwner(o)
+            setViewTreeSavedStateRegistryOwner(o)
             setContent { StatusBarContent(m.state) }
         }
         val p = WindowManager.LayoutParams(
