@@ -461,8 +461,12 @@ internal class ShadeWindow(
         anim?.cancel()
         phase = Phase.SETTLING
         anim = ValueAnimator.ofFloat(progress, if (open) 1f else 0f).apply {
-            duration = 220L
-            interpolator = DecelerateInterpolator()
+            duration = if (open) 450L else 220L
+            interpolator = if (open) {
+                android.animation.TimeInterpolator { t ->
+                    1f - Math.exp(-8.0 * t).toFloat() * Math.cos(9.0 * t).toFloat()
+                }
+            } else DecelerateInterpolator()
             addUpdateListener { applyProgress(it.animatedValue as Float) }
             addListener(object : AnimatorListenerAdapter() {
                 private var canceled = false

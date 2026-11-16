@@ -181,10 +181,10 @@ internal fun UnifiedPanel(
                             val list = g.value
                             val open = expanded[g.key] == true
                             when {
-                                list.size == 1 -> listOf(NotifEntry("s" + list[0].key, list[0], list, g.key, 0))
-                                !open -> listOf(NotifEntry("h" + g.key, list[0], list, g.key, 1))
+                                list.size == 1 -> listOf(NotifEntry(list[0].key, list[0], list, g.key, 0))
+                                !open -> listOf(NotifEntry(list[0].key, list[0], list, g.key, 1))
                                 else -> list.mapIndexed { i, it ->
-                                    NotifEntry("e" + it.key, it, list, g.key, if (i == list.lastIndex) 2 else 0)
+                                    NotifEntry(it.key, it, list, g.key, if (i == list.lastIndex) 2 else 0)
                                 }
                             }
                         }

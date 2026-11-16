@@ -133,7 +133,7 @@ private fun ToggleBox(
         label = "foreground",
     )
     val radius by animateDpAsState(
-        targetValue = if (active) activeRadius else inactiveRadius,
+        targetValue = if (pressed) 12.dp else if (active) activeRadius else inactiveRadius,
         animationSpec = spring(
             dampingRatio = 0.5f,
             stiffness = Spring.StiffnessLow,
@@ -264,7 +264,7 @@ internal fun PillSlider(
     // Segue o dedo na hora; quando o valor muda por fora, desliza suave.
     val shown by animateFloatAsState(
         targetValue = value.coerceIn(0f, 1f),
-        animationSpec = if (pressed) snap() else tween(250),
+        animationSpec = if (pressed) spring(dampingRatio = 1f, stiffness = 1500f) else tween(250),
         label = "sliderValue",
     )
     val handleColor = lerp(fillColor, Color.White, 0.35f)
@@ -365,7 +365,12 @@ internal fun PillSlider(
                     tint = iconTint,
                     modifier = Modifier
                         .padding(start = 16.dp)
-                        .size(24.dp),
+                        .size(24.dp)
+                        .graphicsLayer {
+                            val k = 0.85f + 0.3f * shown
+                            scaleX = k
+                            scaleY = k
+                        },
                 )
             }
             if (showPercent) {

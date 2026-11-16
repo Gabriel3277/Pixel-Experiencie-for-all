@@ -1,6 +1,11 @@
 package com.pixelexperience.forall.controlcenter.ui
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -151,14 +156,19 @@ internal fun ControlCard(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 // Topo
+                Box(modifier = Modifier.entrance(0)) {
+                AnimatedContent(
+                    targetState = editing,
+                    transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(120)) },
+                    label = "header",
+                ) { editingNow ->
                 Row(
                     modifier = Modifier
-                        .entrance(0)
                         .fillMaxWidth()
                         .height(40.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (editing) {
+                    if (editingNow) {
                         Text(
                             text = "Editar blocos",
                             color = c.onPanel,
@@ -193,6 +203,8 @@ internal fun ControlCard(
                             onClick = actions::showPowerMenu,
                         )
                     }
+                }
+                }
                 }
 
                 // Brilho (o slider de volume foi removido)
