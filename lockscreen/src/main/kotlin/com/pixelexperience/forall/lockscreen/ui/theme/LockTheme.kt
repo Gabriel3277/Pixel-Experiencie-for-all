@@ -8,6 +8,7 @@ import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -82,7 +83,7 @@ private fun lockTypography(): Typography {
  * Esquema escuro tonal gerado a partir da cor do wallpaper (mesma ideia do Dynamic Color:
  * uma matiz, papéis primary/secondary/tertiary em tons fixos). Funciona também com wallpaper personalizado.
  */
-fun lockColorScheme(seed: Color): ColorScheme {
+fun lockColorScheme(seed: Color, dark: Boolean = true): ColorScheme {
     val hsl = FloatArray(3)
     ColorUtils.colorToHSL(seed.toArgb(), hsl)
     val h = hsl[0]
@@ -92,6 +93,23 @@ fun lockColorScheme(seed: Color): ColorScheme {
     val n = s * 0.22f   // neutros
     val v = s * 0.38f   // neutros-variantes / secundária
     val a = s * 0.75f   // terciária
+    if (!dark) {
+        return lightColorScheme(
+            primary = t(s, .40f), onPrimary = t(s, 1f),
+            primaryContainer = t(s, .90f), onPrimaryContainer = t(s, .10f),
+            secondary = t(v, .40f), onSecondary = t(v, 1f),
+            secondaryContainer = t(v, .90f), onSecondaryContainer = t(v, .12f),
+            tertiary = t(a, .40f, 60f), onTertiary = t(a, 1f, 60f),
+            tertiaryContainer = t(a, .90f, 60f), onTertiaryContainer = t(a, .12f, 60f),
+            background = t(n, .98f), onBackground = t(n, .10f),
+            surface = t(n, .98f), onSurface = t(n, .10f),
+            surfaceVariant = t(v, .90f), onSurfaceVariant = t(v, .30f),
+            outline = t(v, .50f), outlineVariant = t(v, .80f),
+            surfaceContainerLowest = t(n, 1f), surfaceContainerLow = t(n, .96f),
+            surfaceContainer = t(n, .94f), surfaceContainerHigh = t(n, .92f),
+            surfaceContainerHighest = t(n, .90f),
+        )
+    }
     return darkColorScheme(
         primary = t(s, .80f), onPrimary = t(s, .14f),
         primaryContainer = t(s, .27f), onPrimaryContainer = t(s, .90f),

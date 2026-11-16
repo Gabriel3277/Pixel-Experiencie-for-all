@@ -112,7 +112,8 @@ private class Entry(
 
 /** Cores sólidas e opacas dos cartões, derivadas do tom (surfaceContainerHigh) e do accent da lockscreen. */
 private class Pal(val tint: Color, val accent: Color) {
-    val onCard: Color = if (tint.luminance() > 0.5f) Color(0xFF1C1B1F) else Color(0xFFE6E1E5)
+    // texto = o proprio tom do cartao levado quase ao preto/branco (acompanha a paleta, contraste automatico)
+    val onCard: Color = if (tint.luminance() > 0.5f) lerp(tint, Color.Black, 0.88f) else lerp(tint, Color.White, 0.88f)
     val stack1: Color = lerp(tint, Color.Black, 0.10f)
     val stack2: Color = lerp(tint, Color.Black, 0.20f)
     fun card(priority: Boolean): Color = tint

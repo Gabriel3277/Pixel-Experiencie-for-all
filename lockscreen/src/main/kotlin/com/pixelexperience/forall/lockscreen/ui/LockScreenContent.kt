@@ -120,6 +120,8 @@ import androidx.compose.material3.ColorScheme
 import com.pixelexperience.forall.lockscreen.ui.theme.DateFont
 import com.pixelexperience.forall.lockscreen.ui.theme.LockMotion
 import com.pixelexperience.forall.lockscreen.ui.theme.lockColorScheme
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.ui.graphics.luminance
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -186,15 +188,18 @@ fun LockScreenContent(
     val density = LocalDensity.current
     val palette = wallpaper?.palette ?: LockPalette.Default
     // Dynamic Color a partir do wallpaper: todos os papéis (clock, cards, atalhos) vêm do mesmo esquema tonal
-    val scheme = remember(palette.accent) { lockColorScheme(palette.accent) }
+    val dark = isSystemInDarkTheme()
+    val scheme = remember(palette.accent, dark) { lockColorScheme(palette.accent, dark) }
+    // relogio fica como estava: sempre o esquema escuro (nao muda com o tema)
+    val clockScheme = remember(palette.accent) { lockColorScheme(palette.accent) }
     val clockTint = when (settings.clockColor) {
-        ClockColor.DYNAMIC -> scheme.onPrimaryContainer
-        ClockColor.ACCENT -> scheme.primary
+        ClockColor.DYNAMIC -> clockScheme.onPrimaryContainer
+        ClockColor.ACCENT -> clockScheme.primary
         ClockColor.WHITE -> Color.White
     }
     val clockTint2 = when (settings.clockColor) {
-        ClockColor.DYNAMIC -> scheme.onTertiaryContainer
-        ClockColor.ACCENT -> scheme.tertiary
+        ClockColor.DYNAMIC -> clockScheme.onTertiaryContainer
+        ClockColor.ACCENT -> clockScheme.tertiary
         ClockColor.WHITE -> Color.White.copy(alpha = 0.92f)
     }
     val scope = rememberCoroutineScope()
@@ -464,11 +469,11 @@ fun LockScreenContent(
                         ) {
                             Column(Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
                                 Text(
-                                    "Notificações desativadas", color = Color.White,
+                                    "Notificações desativadas", color = scheme.onSurface,
                                     style = TextStyle(fontFamily = lockFont(600), fontSize = 15.sp),
                                 )
                                 Text(
-                                    "Toque para liberar o acesso às notificações", color = Color.White.copy(alpha = 0.78f),
+                                    "Toque para liberar o acesso às notificações", color = scheme.onSurfaceVariant,
                                     style = TextStyle(fontFamily = lockFont(400), fontSize = 14.sp),
                                 )
                             }
@@ -513,7 +518,10 @@ private fun ShortcutSlot(
             icon = type.icon(torchOn), description = type.label,
             active = type == ShortcutType.FLASHLIGHT && torchOn,
             accent = scheme.primary, onAccent = scheme.onPrimary,
-            tint = scheme.onPrimaryContainer, opacity = 1f, iconColor = scheme.primaryContainer,
+            // par tonal com contraste garantido: circulo claro + icone escuro (escuro) ou o inverso do esquema (claro)
+            tint = if (scheme.background.luminance() > 0.5f) scheme.primaryContainer else scheme.onPrimaryContainer,
+            opacity = 1f,
+            iconColor = if (scheme.background.luminance() > 0.5f) scheme.onPrimaryContainer else scheme.primaryContainer,
             onClick = { onShortcut(type) },
         )
     }
