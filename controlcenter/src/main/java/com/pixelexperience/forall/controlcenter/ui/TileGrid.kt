@@ -4,6 +4,9 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.background
@@ -122,7 +125,7 @@ internal fun TileGrid(
     }
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val gap = 12.dp
+        val gap = Pd.Gap
         val unit = (maxWidth - gap * 3) / 4
         val rows = pack(layout)
 
@@ -157,7 +160,7 @@ internal fun TileGrid(
         Column(verticalArrangement = Arrangement.spacedBy(gap)) {
             var order = 0
             rows.forEach { row ->
-                val rowHeight = if (row.any { it.second >= 2 }) 76.dp else 64.dp
+                val rowHeight = if (row.any { it.second >= 2 }) Pd.WideTileHeight else Pd.TileHeight
                 val lifted = row.any { it.first.id == dragId }
                 Row(
                     modifier = Modifier.zIndex(if (lifted) 1f else 0f),
@@ -237,6 +240,17 @@ private fun GridTile(
         label = "angle",
     )
 
+    val wiggle by animateFloatAsState(
+        targetValue = if (editing) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow),
+        label = "wiggleAmount",
+    )
+    val lift by animateFloatAsState(
+        targetValue = if (isDragging) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 450f),
+        label = "lift",
+    )
+
     val resizeNow by rememberUpdatedState(onResize)
     val dragStartNow by rememberUpdatedState(onDragStart)
     val dragNow by rememberUpdatedState(onDrag)
@@ -247,14 +261,14 @@ private fun GridTile(
             .size(width, height)
             .onGloballyPositioned { onBounds(it.boundsInRoot()) }
             .graphicsLayer {
-                if (editing && !isDragging) rotationZ = angle
+                if (!isDragging) rotationZ = angle * wiggle
                 if (isDragging) {
                     translationX = dragOffset.x
                     translationY = dragOffset.y
-                    scaleX = 1.06f
-                    scaleY = 1.06f
-                    alpha = 0.92f
                 }
+                scaleX = 1f + 0.07f * lift
+                scaleY = 1f + 0.07f * lift
+                alpha = 1f - 0.08f * lift
             },
         contentAlignment = Alignment.Center,
     ) {

@@ -7,6 +7,10 @@ import androidx.compose.ui.unit.sp
 
 /** Tokens do painel (Material 3 Expressive): formas e tipografia num só lugar. */
 internal object Pd {
+    val Gap = 12.dp
+    val SectionGap = 12.dp
+    val TileHeight = 64.dp
+    val WideTileHeight = 76.dp
     val CardRadius = 36.dp
     val NotifOuter = 28.dp
     val NotifInner = 8.dp

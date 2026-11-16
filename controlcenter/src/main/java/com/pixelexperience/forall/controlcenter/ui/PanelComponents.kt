@@ -277,7 +277,7 @@ internal fun PillSlider(
         animationSpec = if (pressed) spring(dampingRatio = 1f, stiffness = 1500f) else tween(250),
         label = "sliderValue",
     )
-    val handleColor = lerp(fillColor, Color.White, 0.35f)
+    val handleColor = fillColor
 
     // Trecho em que o centro da alça pode andar: sobra uma pílula mínima
     // (22 dp) + o espaço (8 dp) de cada lado.
