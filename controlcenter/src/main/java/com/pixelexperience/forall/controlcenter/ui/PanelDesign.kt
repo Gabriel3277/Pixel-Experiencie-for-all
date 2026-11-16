@@ -9,12 +9,14 @@ import androidx.compose.ui.unit.sp
 internal object Pd {
     val Gap = 12.dp
     val SectionGap = 12.dp
+    val CompactTileHeight = 56.dp
     val TileHeight = 64.dp
     val WideTileHeight = 76.dp
     val CardRadius = 36.dp
     val NotifOuter = 28.dp
     val NotifInner = 8.dp
 
+    val Time = TextStyle(fontSize = 44.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp)
     val Title = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.2).sp)
     val Label = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold)
     val Caption = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold)

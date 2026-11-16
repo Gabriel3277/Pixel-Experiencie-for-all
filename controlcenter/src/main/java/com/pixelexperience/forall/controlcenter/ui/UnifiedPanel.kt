@@ -56,6 +56,14 @@ import com.pixelexperience.forall.controlcenter.PanelActions
 import com.pixelexperience.forall.controlcenter.PanelState
 import com.pixelexperience.forall.controlcenter.R
 import kotlinx.coroutines.delay
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.material3.Surface
 
 private val FooterHeight = 72.dp
 
@@ -94,6 +102,7 @@ internal fun UnifiedPanel(
     // Layout dos blocos e Edit Mode.
     var layout by remember { mutableStateOf(TileLayoutStore.load(context)) }
     var editing by remember { mutableStateOf(false) }
+    LaunchedEffect(editing) { state.editing = editing }
 
     // Pilhas abertas (por app) e grupos (um por app, na ordem da notificação mais recente).
     val expanded = remember { mutableStateMapOf<String, Boolean>() }
@@ -127,46 +136,24 @@ internal fun UnifiedPanel(
                     .fillMaxWidth()
                     .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
             )
-        } else Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp),
+        } else AnimatedVisibility(
+            visible = !state.qsExpanded,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            enter = fadeIn() + expandVertically(spring(stiffness = Spring.StiffnessMediumLow)),
+            exit = fadeOut() + shrinkVertically(spring(stiffness = Spring.StiffnessMediumLow)),
         ) {
-            Row(
-                modifier = Modifier
-                    .entrance(5)
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Notificações",
-                    color = c.onPanel,
-                    style = Pd.Title,
-                    modifier = Modifier.weight(1f),
-                )
-                if (hasAccess && canClear) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(c.card)
-                            .clickable { NotificationStore.clearAll() }
-                            .padding(horizontal = 18.dp, vertical = 10.dp),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.cc_np_clear),
-                            color = c.onTileOff,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                        )
-                    }
-                }
-            }
-
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+        ) {
             // A lista ocupa toda a área; o rodapé fica por cima (sem corte seco).
-            Box(modifier = Modifier.entrance(6).weight(1f).fillMaxWidth()) {
+            Surface(
+                modifier = Modifier.entrance(5).weight(1f).fillMaxWidth(),
+                color = c.panel,
+                shape = RoundedCornerShape(Pd.CardRadius),
+            ) {
+            Box(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
                 when {
                     !hasAccess -> AccessCard(c, actions)
                     groups.isEmpty() -> Text(
@@ -289,7 +276,29 @@ internal fun UnifiedPanel(
                             fontWeight = FontWeight.Medium,
                         )
                     }
-                    Box(modifier = Modifier.weight(1f))
+                    Box(
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (hasAccess && canClear) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(c.tileOff)
+                                    .clickable { NotificationStore.clearAll() },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.cc_np_clear),
+                                    color = c.onTileOff,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                            }
+                        }
+                    }
                     Box(
                         modifier = Modifier
                             .size(48.dp)
@@ -302,6 +311,8 @@ internal fun UnifiedPanel(
                     }
                 }
             }
+            }
+        }
         }
     }
 }

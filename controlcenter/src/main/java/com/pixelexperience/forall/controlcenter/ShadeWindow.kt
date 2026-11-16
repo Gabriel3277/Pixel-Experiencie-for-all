@@ -92,6 +92,7 @@ internal class ShadeWindow(
     private var moved = false
     private var downOnScrim = false
     private var closeAllowed = true
+    private var modeHandled = false
     private var lastDismissAt = 0L
 
     private val screenReceiver = object : BroadcastReceiver() {
@@ -221,11 +222,26 @@ internal class ShadeWindow(
                 startX = ev.rawX
                 moved = false
                 downOnScrim = false
+                modeHandled = false
                 closeAllowed = canStartClose(ev.rawY)
             }
             MotionEvent.ACTION_MOVE -> {
-                val dy = startY - ev.rawY
-                if (closeAllowed && dy > touchSlop * 2 && dy > abs(startX - ev.rawX)) {
+                val up = startY - ev.rawY
+                val vertical = abs(up) > touchSlop * 2 && abs(up) > abs(startX - ev.rawX)
+                if (vertical && !panelState.editing) {
+                    val qsEnd = if (panelState.qsBottomPx > 0f) panelState.qsBottomPx else panelHeightPx * 0.4f
+                    if (up < 0 && !panelState.qsExpanded && startY <= qsEnd) {
+                        modeHandled = true
+                        panelState.qsExpanded = true
+                        return true
+                    }
+                    if (up > 0 && panelState.qsExpanded) {
+                        modeHandled = true
+                        panelState.qsExpanded = false
+                        return true
+                    }
+                }
+                if (closeAllowed && up > touchSlop * 2 && up > abs(startX - ev.rawX)) {
                     beginClose(ev)
                     return true
                 }
@@ -293,12 +309,14 @@ internal class ShadeWindow(
                 startY = ev.rawY
                 startX = ev.rawX
                 moved = false
-                downOnScrim = ev.y > panelHeightPx
+                modeHandled = false
+                downOnScrim = ev.y > panelHeightPx ||
+                    (panelState.qsExpanded && !panelState.editing && ev.rawY > panelState.qsBottomPx)
                 closeAllowed = canStartClose(ev.rawY)
             }
             MotionEvent.ACTION_MOVE -> {
                 if (abs(ev.rawY - startY) > touchSlop) moved = true
-                if (closeAllowed && startY - ev.rawY > touchSlop * 2) beginClose(ev)
+                if (closeAllowed && !modeHandled && startY - ev.rawY > touchSlop * 2) beginClose(ev)
             }
             MotionEvent.ACTION_UP -> {
                 if (downOnScrim && !moved) settle(false) // toque fora do painel
@@ -312,7 +330,8 @@ internal class ShadeWindow(
      * então só fecha arrastando da alça de baixo (ou do fundo escurecido).
      */
     private fun canStartClose(y: Float): Boolean =
-        y > panelHeightPx - 80f * density
+        y > panelHeightPx - 80f * density ||
+            (!panelState.qsExpanded && !panelState.editing && y <= panelState.qsBottomPx)
 
     private fun beginClose(ev: MotionEvent) {
         phase = Phase.CLOSING
@@ -338,6 +357,8 @@ internal class ShadeWindow(
     // ------------------------------------------------------------------
 
     private fun attachPanel() {
+        panelState.qsExpanded = false
+        panelState.editing = false
         val host = root ?: return
         shadeProgress.floatValue = progress
         val bv = android.widget.ImageView(service).apply {

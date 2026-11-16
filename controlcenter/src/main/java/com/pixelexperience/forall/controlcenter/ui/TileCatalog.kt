@@ -40,6 +40,7 @@ internal object TileCatalog {
         TileSpec("nfc", "NFC", TileCategory.CONNECTIVITY, R.drawable.cc_ic_nfc),
         TileSpec("vpn", "VPN", TileCategory.CONNECTIVITY, R.drawable.cc_ic_vpn),
         TileSpec("hotspot", "Hotspot", TileCategory.CONNECTIVITY, R.drawable.cc_ic_hotspot),
+        TileSpec("modes", "Modos", TileCategory.SYSTEM, R.drawable.cc_ic_modes),
         TileSpec("quickshare", "Quick Share", TileCategory.CONNECTIVITY, R.drawable.cc_ic_share),
         TileSpec("airplane", "Modo avião", TileCategory.CONNECTIVITY, R.drawable.cc_ic_airplane),
         TileSpec("darktheme", "Tema escuro", TileCategory.SYSTEM, R.drawable.cc_ic_contrast),
@@ -63,6 +64,8 @@ internal object TileCatalog {
     val defaultLayout: List<TilePlace> = listOf(
         TilePlace("internet", 2),
         TilePlace("bluetooth", 2),
+        TilePlace("modes", 2),
+        TilePlace("quickshare", 2),
         TilePlace("torch", 1),
         TilePlace("airplane", 1),
         TilePlace("rotate", 1),
@@ -105,6 +108,7 @@ internal object TileLayoutStore {
 
 /** Estado do sistema que não vem do PanelState (lido a cada segundo). */
 internal data class SysSnapshot(
+    val dnd: Boolean = false,
     val dark: Boolean = false,
     val location: Boolean = false,
     val battery: Boolean = false,
@@ -145,7 +149,15 @@ internal fun readSystem(ctx: Context): SysSnapshot {
     } catch (_: Exception) {
         false
     }
+    val dnd = try {
+        val f = ctx.getSystemService(android.app.NotificationManager::class.java)?.currentInterruptionFilter
+        f != null && f != android.app.NotificationManager.INTERRUPTION_FILTER_ALL &&
+            f != android.app.NotificationManager.INTERRUPTION_FILTER_UNKNOWN
+    } catch (_: Exception) {
+        false
+    }
     return SysSnapshot(
+        dnd = dnd,
         dark = dark,
         location = location,
         battery = battery,
@@ -192,6 +204,10 @@ internal fun tileUi(
         "hotspot" -> TileUi(
             false, "", true,
             open(Intent("android.settings.TETHER_SETTINGS"), Intent(Settings.ACTION_WIRELESS_SETTINGS)),
+        )
+        "modes" -> TileUi(
+            sys.dnd, onOff(sys.dnd), true,
+            open(Intent("android.settings.ZEN_MODE_SETTINGS"), Intent(Settings.ACTION_SOUND_SETTINGS)),
         )
         "quickshare" -> TileUi(
             false, "", true,

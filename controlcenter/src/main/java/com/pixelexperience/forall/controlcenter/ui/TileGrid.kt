@@ -63,6 +63,12 @@ import com.pixelexperience.forall.controlcenter.PanelActions
 import com.pixelexperience.forall.controlcenter.PanelState
 import com.pixelexperience.forall.controlcenter.R
 import kotlinx.coroutines.delay
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 
 /** Distribui os blocos em linhas de 4 colunas, sem deixar espaço vazio no fim de cada linha. */
 private fun pack(items: List<TilePlace>): List<List<Pair<TilePlace, Int>>> {
@@ -103,6 +109,8 @@ internal fun TileGrid(
     state: PanelState,
     actions: PanelActions,
     colors: PanelColors,
+    compact: Boolean = false,
+    maxRows: Int = 2,
 ) {
     val ctx = LocalContext.current
     var sys by remember { mutableStateOf(readSystem(ctx)) }
@@ -157,19 +165,34 @@ internal fun TileGrid(
             dragOffset = Offset.Zero
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(gap)) {
-            var order = 0
-            rows.forEach { row ->
-                val rowHeight = if (row.any { it.second >= 2 }) Pd.WideTileHeight else Pd.TileHeight
+        Column {
+            rows.forEachIndexed { rowIndex, row ->
+                val rowHeight by animateDpAsState(
+                    targetValue = when {
+                        compact -> Pd.CompactTileHeight
+                        row.any { it.second >= 2 } -> Pd.WideTileHeight
+                        else -> Pd.TileHeight
+                    },
+                    animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
+                    label = "rowHeight",
+                )
+                val rowBase = rows.take(rowIndex).sumOf { it.size }
                 val lifted = row.any { it.first.id == dragId }
+                AnimatedVisibility(
+                    visible = !compact || rowIndex < maxRows,
+                    enter = fadeIn() + expandVertically(spring(stiffness = Spring.StiffnessMediumLow)),
+                    exit = fadeOut() + shrinkVertically(spring(stiffness = Spring.StiffnessMediumLow)),
+                ) {
                 Row(
-                    modifier = Modifier.zIndex(if (lifted) 1f else 0f),
+                    modifier = Modifier
+                        .padding(top = if (rowIndex > 0) gap else 0.dp)
+                        .zIndex(if (lifted) 1f else 0f),
                     horizontalArrangement = Arrangement.spacedBy(gap),
                 ) {
-                    row.forEach { (place, span) ->
+                    row.forEachIndexed { colIndex, (place, span) ->
                         val spec = TileCatalog.byId[place.id]
                         if (spec != null) {
-                            val index = order++
+                            val index = rowBase + colIndex
                             key(place.id) {
                                 GridTile(
                                     span = span,
@@ -203,6 +226,7 @@ internal fun TileGrid(
                             }
                         }
                     }
+                }
                 }
             }
         }

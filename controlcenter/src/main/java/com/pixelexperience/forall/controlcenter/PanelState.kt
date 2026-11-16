@@ -34,6 +34,11 @@ internal class PanelState(private val context: Context) {
         private set
     var autoRotate by mutableStateOf(false)
         private set
+    /** Modo do painel: false = combinado (QS compacto + notificações), true = QS completo. */
+    var qsExpanded by mutableStateOf(false)
+    var editing by mutableStateOf(false)
+    var qsBottomPx by mutableFloatStateOf(0f)
+
     var brightness by mutableFloatStateOf(0.5f)
         private set
     var canWriteSettings by mutableStateOf(false)

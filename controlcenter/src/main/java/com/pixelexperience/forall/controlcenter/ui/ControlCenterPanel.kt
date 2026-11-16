@@ -42,6 +42,25 @@ import com.pixelexperience.forall.controlcenter.PanelActions
 import com.pixelexperience.forall.controlcenter.PanelState
 import com.pixelexperience.forall.controlcenter.R
 import kotlinx.coroutines.delay
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+import android.text.format.DateFormat
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableIntStateOf
 
 /** Mantido por compatibilidade: o cartão agora tem altura própria (varia com os blocos). */
 internal const val PANEL_CONTENT_DP = 388
@@ -139,11 +158,13 @@ internal fun ControlCard(
     }
 
     val c = rememberPanelColors()
+    val expanded = state.qsExpanded
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 12.dp, end = 12.dp, top = topInset + 8.dp, bottom = 8.dp),
+            .padding(start = 12.dp, end = 12.dp, top = topInset + 8.dp, bottom = 8.dp)
+            .onGloballyPositioned { state.qsBottomPx = it.boundsInRoot().bottom },
     ) {
         Surface(
             modifier = Modifier
@@ -152,64 +173,49 @@ internal fun ControlCard(
                     spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
                 ),
             color = c.panel,
-            shape = RoundedCornerShape(36.dp),
+            shape = RoundedCornerShape(Pd.CardRadius),
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(Pd.SectionGap),
             ) {
-                // Topo
-                Box(modifier = Modifier.entrance(0)) {
-                AnimatedContent(
-                    targetState = editing,
-                    transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(120)) },
-                    label = "header",
-                ) { editingNow ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(40.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                // Cabeçalho: relógio e data no modo expandido; título no Edit Mode.
+                AnimatedVisibility(
+                    visible = expanded || editing,
+                    modifier = Modifier.entrance(0),
+                    enter = fadeIn(tween(200)) + expandVertically(spring(stiffness = Spring.StiffnessMediumLow)),
+                    exit = fadeOut(tween(120)) + shrinkVertically(spring(stiffness = Spring.StiffnessMediumLow)),
                 ) {
-                    if (editingNow) {
-                        Text(
-                            text = "Editar blocos",
-                            color = c.onPanel,
-                            style = Pd.Title,
-                            modifier = Modifier.weight(1f),
-                        )
-                        HeaderButton(
-                            icon = R.drawable.cc_ic_check,
-                            label = "Concluir",
-                            tint = c.onPanel,
-                            onClick = { onEditingChange(false) },
-                        )
-                    } else {
-                        HeaderButton(
-                            icon = R.drawable.cc_ic_pencil,
-                            label = "Editar blocos",
-                            tint = c.onPanel,
-                            onClick = { onEditingChange(true) },
-                        )
-                        HeaderButton(
-                            icon = R.drawable.cc_ic_settings,
-                            label = stringResource(R.string.cc_settings),
-                            tint = c.onPanel,
-                            onClick = actions::openSettings,
-                        )
-                        Spacer(Modifier.weight(1f))
-                        HeaderButton(
-                            icon = R.drawable.cc_ic_power,
-                            label = stringResource(R.string.cc_power),
-                            tint = c.onPanel,
-                            onClick = actions::showPowerMenu,
-                        )
+                    AnimatedContent(
+                        targetState = editing,
+                        transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(120)) },
+                        label = "header",
+                    ) { editingNow ->
+                        if (editingNow) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().height(40.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "Editar blocos",
+                                    color = c.onPanel,
+                                    style = Pd.Title,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                HeaderButton(
+                                    icon = R.drawable.cc_ic_check,
+                                    label = "Concluir",
+                                    tint = c.onPanel,
+                                    onClick = { onEditingChange(false) },
+                                )
+                            }
+                        } else {
+                            ClockHeader(c)
+                        }
                     }
                 }
-                }
-                }
 
-                // Brilho (o slider de volume foi removido)
+                // Brilho (nos dois modos)
                 Row(
                     modifier = Modifier
                         .entrance(1)
@@ -244,7 +250,7 @@ internal fun ControlCard(
                     )
                 }
 
-                // Blocos (sem espaços vazios; o volume liberou uma linha)
+                // Blocos: 2 linhas no modo combinado, grade completa no expandido.
                 TileGrid(
                     layout = layout,
                     editing = editing,
@@ -252,8 +258,103 @@ internal fun ControlCard(
                     state = state,
                     actions = actions,
                     colors = c,
+                    compact = !expanded && !editing,
                 )
+
+                // Rodapé do modo expandido: editar, configurações e energia.
+                AnimatedVisibility(
+                    visible = expanded && !editing,
+                    enter = fadeIn(tween(200)) + expandVertically(spring(stiffness = Spring.StiffnessMediumLow)),
+                    exit = fadeOut(tween(120)) + shrinkVertically(spring(stiffness = Spring.StiffnessMediumLow)),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        HeaderButton(
+                            icon = R.drawable.cc_ic_pencil,
+                            label = "Editar blocos",
+                            tint = c.onPanel,
+                            onClick = { onEditingChange(true) },
+                        )
+                        HeaderButton(
+                            icon = R.drawable.cc_ic_settings,
+                            label = stringResource(R.string.cc_settings),
+                            tint = c.onPanel,
+                            onClick = actions::openSettings,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        HeaderButton(
+                            icon = R.drawable.cc_ic_power,
+                            label = stringResource(R.string.cc_power),
+                            tint = c.onPanel,
+                            onClick = actions::showPowerMenu,
+                        )
+                    }
+                }
+
+                // Alça: alterna entre o modo combinado e o expandido.
+                if (!editing) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(20.dp)
+                            .clickable { state.qsExpanded = !state.qsExpanded },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(width = 36.dp, height = 4.dp)
+                                .clip(CircleShape)
+                                .background(c.onPanel.copy(alpha = 0.35f)),
+                        )
+                    }
+                }
             }
+        }
+    }
+}
+
+/** Relógio grande, data e bateria (cabeçalho do modo expandido). */
+@Composable
+private fun ClockHeader(c: PanelColors) {
+    val ctx = LocalContext.current
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var battery by remember { mutableIntStateOf(-1) }
+    var charging by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = System.currentTimeMillis()
+            val i = ctx.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            if (i != null) {
+                val level = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                val scale = i.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+                battery = if (level >= 0 && scale > 0) level * 100 / scale else -1
+                val st = i.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                charging = st == BatteryManager.BATTERY_STATUS_CHARGING ||
+                    st == BatteryManager.BATTERY_STATUS_FULL
+            }
+            delay(1000)
+        }
+    }
+    val time = remember(now / 60_000L) { DateFormat.getTimeFormat(ctx).format(Date(now)) }
+    val date = remember(now / 3_600_000L) {
+        SimpleDateFormat("EEE, d MMM", Locale.getDefault()).format(Date(now))
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = time, color = c.onPanel, style = Pd.Time)
+            Text(text = date, color = c.onPanel.copy(alpha = 0.7f), style = Pd.Label)
+        }
+        if (battery >= 0) {
+            Text(
+                text = if (charging) "Carregando · $battery%" else "$battery%",
+                color = c.onPanel,
+                style = Pd.Label,
+            )
         }
     }
 }
