@@ -342,7 +342,7 @@ internal class ShadeWindow(
         val bv = android.widget.ImageView(service).apply {
             scaleType = android.widget.ImageView.ScaleType.FIT_XY
             alpha = 0f
-            setColorFilter(Color.argb(110, 0, 0, 0))
+            setColorFilter(Color.argb(60, 0, 0, 0))
             setImageBitmap(shot)
             if (android.os.Build.VERSION.SDK_INT >= 31) {
                 setRenderEffect(
@@ -393,7 +393,7 @@ internal class ShadeWindow(
     private fun applyProgress(p: Float) {
         progress = p
         panel?.translationY = -panelHeightPx * (1f - p)
-        root?.setBackgroundColor(Color.argb((90f * p).toInt(), 0, 0, 0))
+        root?.setBackgroundColor(Color.argb((70f * p).toInt(), 0, 0, 0))
         applyBlur(p)
         blurView?.alpha = p
     }

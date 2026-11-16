@@ -143,7 +143,7 @@ internal fun ControlCard(
                 .animateContentSize(
                     spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow),
                 ),
-            color = c.panel.copy(alpha = 0.86f),
+            color = c.panel,
             shape = RoundedCornerShape(36.dp),
         ) {
             Column(
