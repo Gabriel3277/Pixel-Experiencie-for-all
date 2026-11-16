@@ -45,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -122,6 +123,11 @@ private fun ToggleBox(
         ),
         label = "press",
     )
+    val stateLayer by animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = tween(120),
+        label = "stateLayer",
+    )
     val container by animateColorAsState(
         targetValue = if (active) colors.tileOn else colors.tileOff,
         animationSpec = tween(300),
@@ -170,6 +176,10 @@ private fun ToggleBox(
         }
         .clip(RoundedCornerShape(radius.coerceAtLeast(0.dp)))
         .background(container)
+        .drawWithContent {
+            drawContent()
+            drawRect(color = foreground.copy(alpha = 0.14f * stateLayer))
+        }
 
     if (onClick != null) {
         boxModifier = boxModifier.clickable(
@@ -524,6 +534,18 @@ internal fun SmallTile(
  */
 @Composable
 internal fun Modifier.entrance(index: Int): Modifier {
+    // Com painel deslizante: cada bloco aparece numa janela do progresso (cascata presa ao dedo).
+    val sp = LocalShadeProgress.current
+    if (sp != null) {
+        return this.graphicsLayer {
+            val v = ((sp.value - index * 0.05f) / 0.55f).coerceIn(0f, 1f)
+            val s = v * v * (3f - 2f * v)
+            alpha = s
+            translationY = (1f - s) * 36.dp.toPx()
+            scaleX = 0.92f + 0.08f * s
+            scaleY = 0.92f + 0.08f * s
+        }
+    }
     val progress = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         delay(index * 45L)

@@ -167,7 +167,7 @@ internal fun UnifiedPanel(
             }
 
             // A lista ocupa toda a área; o rodapé fica por cima (sem corte seco).
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            Box(modifier = Modifier.entrance(6).weight(1f).fillMaxWidth()) {
                 when {
                     !hasAccess -> AccessCard(c, actions)
                     groups.isEmpty() -> Text(

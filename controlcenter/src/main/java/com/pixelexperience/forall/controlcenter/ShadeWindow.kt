@@ -339,6 +339,7 @@ internal class ShadeWindow(
 
     private fun attachPanel() {
         val host = root ?: return
+        shadeProgress.floatValue = progress
         val bv = android.widget.ImageView(service).apply {
             scaleType = android.widget.ImageView.ScaleType.FIT_XY
             alpha = 0f
@@ -364,7 +365,7 @@ internal class ShadeWindow(
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setContent {
                 PixelTheme(dynamicColor = true) {
-                  PanelTypography {
+                  PanelTypography(shadeProgress) {
                     val topInset = with(LocalDensity.current) { statusBarPx.toDp() }
                     if (kind == ShadeKind.NOTIFICATIONS) {
                         UnifiedPanel(state = panelState, topInset = topInset, actions = this@ShadeWindow)
@@ -392,6 +393,7 @@ internal class ShadeWindow(
 
     private fun applyProgress(p: Float) {
         progress = p
+        shadeProgress.floatValue = p
         panel?.translationY = -panelHeightPx * (1f - p)
         root?.setBackgroundColor(Color.argb((70f * p).toInt(), 0, 0, 0))
         applyBlur(p)
@@ -415,6 +417,7 @@ internal class ShadeWindow(
     }
 
     private var blurView: android.widget.ImageView? = null
+    private val shadeProgress = androidx.compose.runtime.mutableFloatStateOf(0f)
     private var shot: android.graphics.Bitmap? = null
 
     /** Print da tela, reduzido: vira o fundo desfocado do painel (Android 11+). */

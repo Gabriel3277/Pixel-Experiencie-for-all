@@ -3,11 +3,17 @@ package com.pixelexperience.forall.controlcenter.ui
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.State
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import com.pixelexperience.forall.controlcenter.R
+
+/** Progresso de abertura do painel (0..1), preso ao dedo/animação; null = sem painel deslizante. */
+internal val LocalShadeProgress = compositionLocalOf<State<Float>?> { null }
 
 /** Quicksand Bold: mesma fonte da UI da lockscreen (cópia local do arquivo). */
 internal val CcFont = FontFamily(Font(R.font.cc_quicksand_bold, FontWeight.Bold))
@@ -17,7 +23,7 @@ internal val CcFont = FontFamily(Font(R.font.cc_quicksand_bold, FontWeight.Bold)
  * Textos sem estilo explícito herdam bodyLarge, então também ficam em Quicksand.
  */
 @Composable
-internal fun PanelTypography(content: @Composable () -> Unit) {
+internal fun PanelTypography(progress: State<Float>? = null, content: @Composable () -> Unit) {
     val base = MaterialTheme.typography
     val typography = remember(base) {
         Typography(
@@ -38,10 +44,12 @@ internal fun PanelTypography(content: @Composable () -> Unit) {
             labelSmall = base.labelSmall.copy(fontFamily = CcFont),
         )
     }
-    MaterialTheme(
-        colorScheme = MaterialTheme.colorScheme,
-        shapes = MaterialTheme.shapes,
-        typography = typography,
-        content = content,
-    )
+    CompositionLocalProvider(LocalShadeProgress provides progress) {
+        MaterialTheme(
+            colorScheme = MaterialTheme.colorScheme,
+            shapes = MaterialTheme.shapes,
+            typography = typography,
+            content = content,
+        )
+    }
 }
