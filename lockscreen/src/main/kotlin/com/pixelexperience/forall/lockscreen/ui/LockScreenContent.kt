@@ -108,6 +108,8 @@ import com.pixelexperience.forall.lockscreen.data.WallpaperRepository
 import com.pixelexperience.forall.lockscreen.data.WallpaperUi
 import com.pixelexperience.forall.lockscreen.notifications.LockAction
 import com.pixelexperience.forall.lockscreen.notifications.LockNotification
+import com.pixelexperience.forall.lockscreen.media.rememberLockMedia
+import com.pixelexperience.forall.lockscreen.ui.components.MediaPlayerCard
 import com.pixelexperience.forall.lockscreen.ui.clock.LockClock
 import com.pixelexperience.forall.lockscreen.widget.HostedClockWidget
 import com.pixelexperience.forall.lockscreen.ui.components.Backdrop
@@ -196,6 +198,8 @@ fun LockScreenContent(
         ClockColor.WHITE -> Color.White.copy(alpha = 0.92f)
     }
     val scope = rememberCoroutineScope()
+    // sessões de mídia reais; só observa com acesso a notificações e fora da pré-visualização
+    val media = rememberLockMedia(settings.showMediaPlayer && notificationAccess && !preview)
     val drag = remember { Animatable(0f) }
     var size by remember { mutableStateOf(IntSize.Zero) }
     val unlockDist = (size.height * 0.30f).coerceAtLeast(1f)
@@ -425,6 +429,16 @@ fun LockScreenContent(
                     },
                 )
                 Spacer(Modifier.height(16.dp))
+                MediaPlayerCard(
+                    media = media,
+                    tint = scheme.surfaceContainerHigh,
+                    onTint = scheme.onSurface,
+                    accent = scheme.primary,
+                    onAccent = scheme.onPrimary,
+                    glass = settings.glassNotifications,
+                    glassOpacity = settings.cardOpacity,
+                    modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 8.dp).layerFx(e2::value, dragFn, 0.6f, 1.2f, distFn),
+                )
                 Box(Modifier.weight(1f).padding(horizontal = 12.dp).layerFx(e2::value, dragFn, 0.6f, 1.2f, distFn)) {
                     NotificationsList(
                         items = shown,
