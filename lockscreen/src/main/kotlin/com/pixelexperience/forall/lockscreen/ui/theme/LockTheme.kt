@@ -10,6 +10,8 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import com.google.android.material.color.utilities.CorePalette
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
@@ -80,57 +82,57 @@ private fun lockTypography(): Typography {
 }
 
 /**
- * Esquema escuro tonal gerado a partir da cor do wallpaper (mesma ideia do Dynamic Color:
- * uma matiz, papéis primary/secondary/tertiary em tons fixos). Funciona também com wallpaper personalizado.
+ * Esquema Material You completo a partir da cor semente (wallpaper): paletas tonais HCT
+ * (CorePalette, mesmo núcleo do Dynamic Color) com papéis M3 nos tons da especificação.
  */
 fun lockColorScheme(seed: Color, dark: Boolean = true): ColorScheme {
-    val hsl = FloatArray(3)
-    ColorUtils.colorToHSL(seed.toArgb(), hsl)
-    val h = hsl[0]
-    val s = hsl[1].coerceIn(0.35f, 0.80f)
-    fun t(sat: Float, l: Float, dh: Float = 0f) =
-        Color(ColorUtils.HSLToColor(floatArrayOf((h + dh + 360f) % 360f, sat.coerceIn(0f, 1f), l)))
-    val n = s * 0.22f   // neutros
-    val v = s * 0.38f   // neutros-variantes / secundária
-    val a = s * 0.75f   // terciária
+    val p = CorePalette.of(seed.toArgb())
+    fun a1(t: Int) = Color(p.a1.tone(t))
+    fun a2(t: Int) = Color(p.a2.tone(t))
+    fun a3(t: Int) = Color(p.a3.tone(t))
+    fun n1(t: Int) = Color(p.n1.tone(t))
+    fun n2(t: Int) = Color(p.n2.tone(t))
+    fun er(t: Int) = Color(p.error.tone(t))
     if (!dark) {
         return lightColorScheme(
-            primary = t(s, .40f), onPrimary = t(s, 1f),
-            primaryContainer = t(s, .90f), onPrimaryContainer = t(s, .10f),
-            secondary = t(v, .40f), onSecondary = t(v, 1f),
-            secondaryContainer = t(v, .90f), onSecondaryContainer = t(v, .12f),
-            tertiary = t(a, .40f, 60f), onTertiary = t(a, 1f, 60f),
-            tertiaryContainer = t(a, .90f, 60f), onTertiaryContainer = t(a, .12f, 60f),
-            background = t(n, .98f), onBackground = t(n, .10f),
-            surface = t(n, .98f), onSurface = t(n, .10f),
-            surfaceVariant = t(v, .90f), onSurfaceVariant = t(v, .30f),
-            outline = t(v, .50f), outlineVariant = t(v, .80f),
-            surfaceContainerLowest = t(n, 1f), surfaceContainerLow = t(n, .96f),
-            surfaceContainer = t(n, .94f), surfaceContainerHigh = t(n, .92f),
-            surfaceContainerHighest = t(n, .90f),
+            primary = a1(40), onPrimary = a1(100), primaryContainer = a1(90), onPrimaryContainer = a1(10),
+            inversePrimary = a1(80),
+            secondary = a2(40), onSecondary = a2(100), secondaryContainer = a2(90), onSecondaryContainer = a2(10),
+            tertiary = a3(40), onTertiary = a3(100), tertiaryContainer = a3(90), onTertiaryContainer = a3(10),
+            background = n1(98), onBackground = n1(10),
+            surface = n1(98), onSurface = n1(10),
+            surfaceVariant = n2(90), onSurfaceVariant = n2(30),
+            inverseSurface = n1(20), inverseOnSurface = n1(95),
+            outline = n2(50), outlineVariant = n2(80),
+            error = er(40), onError = er(100), errorContainer = er(90), onErrorContainer = er(10),
+            surfaceDim = n1(87), surfaceBright = n1(98),
+            surfaceContainerLowest = n1(100), surfaceContainerLow = n1(96),
+            surfaceContainer = n1(94), surfaceContainerHigh = n1(92), surfaceContainerHighest = n1(90),
         )
     }
     return darkColorScheme(
-        primary = t(s, .80f), onPrimary = t(s, .14f),
-        primaryContainer = t(s, .27f), onPrimaryContainer = t(s, .90f),
-        secondary = t(v, .80f), onSecondary = t(v, .15f),
-        secondaryContainer = t(v, .28f), onSecondaryContainer = t(v, .90f),
-        tertiary = t(a, .80f, 60f), onTertiary = t(a, .14f, 60f),
-        tertiaryContainer = t(a, .27f, 60f), onTertiaryContainer = t(a, .90f, 60f),
-        background = t(n, .06f), onBackground = t(n, .92f),
-        surface = t(n, .08f), onSurface = t(n, .92f),
-        surfaceVariant = t(v, .26f), onSurfaceVariant = t(v, .80f),
-        outline = t(v, .56f), outlineVariant = t(v, .30f),
-        surfaceContainerLowest = t(n, .05f), surfaceContainerLow = t(n, .10f),
-        surfaceContainer = t(n, .12f), surfaceContainerHigh = t(n, .16f),
-        surfaceContainerHighest = t(n, .20f),
+        primary = a1(80), onPrimary = a1(20), primaryContainer = a1(30), onPrimaryContainer = a1(90),
+        inversePrimary = a1(40),
+        secondary = a2(80), onSecondary = a2(20), secondaryContainer = a2(30), onSecondaryContainer = a2(90),
+        tertiary = a3(80), onTertiary = a3(20), tertiaryContainer = a3(30), onTertiaryContainer = a3(90),
+        background = n1(6), onBackground = n1(90),
+        surface = n1(6), onSurface = n1(90),
+        surfaceVariant = n2(30), onSurfaceVariant = n2(80),
+        inverseSurface = n1(90), inverseOnSurface = n1(20),
+        outline = n2(60), outlineVariant = n2(30),
+        error = er(80), onError = er(20), errorContainer = er(30), onErrorContainer = er(90),
+        surfaceDim = n1(6), surfaceBright = n1(24),
+        surfaceContainerLowest = n1(4), surfaceContainerLow = n1(10),
+        surfaceContainer = n1(12), surfaceContainerHigh = n1(17), surfaceContainerHighest = n1(22),
     )
 }
 
+/** seed != null: wallpaper próprio do app. seed == null: Dynamic Color do Android. */
 @Composable
-fun LockTheme(seed: Color? = null, content: @Composable () -> Unit) {
+fun LockTheme(seed: Color? = null, dark: Boolean = true, content: @Composable () -> Unit) {
     val ctx = LocalContext.current
-    val scheme = if (seed != null) remember(seed) { lockColorScheme(seed) } else dynamicDarkColorScheme(ctx)
+    val scheme = if (seed != null) remember(seed, dark) { lockColorScheme(seed, dark) }
+    else if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
     MaterialExpressiveTheme(
         colorScheme = scheme,
         shapes = LockShapes,

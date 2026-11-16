@@ -21,7 +21,7 @@ import java.io.File
 import kotlin.math.max
 
 /** Cores derivadas do papel de parede (cores dinâmicas). */
-data class LockPalette(val accent: Color, val onAccent: Color, val clockTint: Color, val cardTint: Color) {
+data class LockPalette(val accent: Color, val onAccent: Color, val clockTint: Color, val cardTint: Color, val seed: Color = accent) {
     companion object {
         val Default = LockPalette(
             accent = Color(0xFF7FDDB0), onAccent = Color(0xFF00391F),
@@ -128,6 +128,7 @@ object WallpaperRepository {
             onAccent = c(0.30f, 0.14f),
             clockTint = Color(ColorUtils.HSLToColor(floatArrayOf(hsl[0], hsl[1].coerceIn(0.25f, 0.6f), 0.90f))),
             cardTint = Color(ColorUtils.HSLToColor(floatArrayOf(hsl[0], hsl[1].coerceIn(0.2f, 0.5f), 0.12f))),
+            seed = Color(rgb),
         )
     }
 }
