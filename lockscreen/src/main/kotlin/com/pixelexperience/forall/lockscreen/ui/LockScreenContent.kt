@@ -436,10 +436,8 @@ fun LockScreenContent(
                 Spacer(Modifier.height(16.dp))
                 MediaPlayerCard(
                     media = media,
-                    subColor = scheme.onSurfaceVariant,
-                    chipColor = scheme.surfaceContainerHighest,
-                    tint = scheme.surfaceContainerHigh,
-                    onTint = scheme.onSurface,
+                    tint = scheme.primaryContainer,
+                    onTint = scheme.onPrimaryContainer,
                     accent = scheme.primary,
                     onAccent = scheme.onPrimary,
                     glass = settings.glassNotifications,

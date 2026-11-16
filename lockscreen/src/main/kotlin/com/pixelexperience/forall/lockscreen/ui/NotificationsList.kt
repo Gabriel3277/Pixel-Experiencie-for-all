@@ -121,7 +121,14 @@ private class Pal(val tint: Color, val accent: Color, sc: ColorScheme) {
     val chip: Color = sc.surfaceContainerHighest
     val stack1: Color = if (dark) sc.surfaceContainer else sc.surfaceContainerHighest
     val stack2: Color = if (dark) sc.surfaceContainerLow else sc.surfaceDim
-    fun card(priority: Boolean): Color = tint
+    val clearBg: Color = sc.primaryContainer
+    val onClear: Color = sc.onPrimaryContainer
+    private val prio: Color = sc.secondaryContainer
+    private val onPrio: Color = sc.onSecondaryContainer
+    fun card(priority: Boolean): Color = if (priority) prio else tint
+    fun textOn(priority: Boolean): Color = if (priority) onPrio else onCard
+    fun variantOn(priority: Boolean): Color = if (priority) lerp(onPrio, prio, 0.25f) else onCardVariant
+    fun chipOn(priority: Boolean): Color = if (priority) lerp(prio, onPrio, 0.14f) else chip
 }
 
 private fun isPt() = Locale.getDefault().language == "pt"
@@ -209,11 +216,11 @@ fun NotificationsList(
         if (items.any { it.clearable }) {
             item(key = "clear_all") {
                 Box(Modifier.fillMaxWidth().padding(top = 8.dp).animateItem(), contentAlignment = Alignment.Center) {
-                    SolidCard(Modifier, RoundedCornerShape(50), pal.tint) {
+                    SolidCard(Modifier, RoundedCornerShape(50), pal.clearBg) {
                         Text(
                             if (isPt()) "Limpar tudo" else "Clear all",
                             modifier = Modifier.clickable { onClearAll() }.padding(horizontal = 24.dp, vertical = 12.dp),
-                            color = pal.onCard,
+                            color = pal.onClear,
                             fontSize = 13.sp,
                             fontFamily = lockFont(600),
                             maxLines = 1,
@@ -354,11 +361,11 @@ private fun GroupHeader(g: Group, pal: Pal, canDismiss: Boolean, onDismissAll: (
         )
         Spacer(Modifier.weight(1f))
         if (canDismiss) {
-            SolidCard(Modifier, RoundedCornerShape(50), pal.tint) {
+            SolidCard(Modifier, RoundedCornerShape(50), pal.clearBg) {
                 Text(
                     if (isPt()) "Limpar" else "Clear",
                     modifier = Modifier.clickable { onDismissAll() }.padding(horizontal = 14.dp, vertical = 8.dp),
-                    color = pal.onCard, fontSize = 13.sp, fontFamily = lockFont(600), maxLines = 1,
+                    color = pal.onClear, fontSize = 13.sp, fontFamily = lockFont(600), maxLines = 1,
                 )
             }
             Spacer(Modifier.width(8.dp))
@@ -404,11 +411,11 @@ private fun NotificationCard(
 
     // cores sólidas: prioritária puxa o accent; os textos secundários são misturas opacas (sem alpha)
     val cardColor = pal.card(priority)
-    val main = pal.onCard
-    val appNameColor = pal.onCardVariant
-    val timeColor = pal.onCardVariant
-    val bodyColor = pal.onCardVariant
-    val chipColor = pal.chip
+    val main = pal.textOn(priority)
+    val appNameColor = pal.variantOn(priority)
+    val timeColor = pal.variantOn(priority)
+    val bodyColor = pal.variantOn(priority)
+    val chipColor = pal.chipOn(priority)
 
     SolidCard(
         modifier = modifier.fillMaxWidth().swipeAway(dismissible, onDismiss)
