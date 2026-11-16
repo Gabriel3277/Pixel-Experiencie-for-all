@@ -238,7 +238,7 @@ internal fun NotifCard(
                 alpha = fade
             }
             .clip(RoundedCornerShape(24.dp))
-            .background(c.tileOff)
+            .background(c.card)
             .then(
                 if (item.clearable) {
                     Modifier.pointerInput(Unit) {
@@ -330,7 +330,8 @@ internal fun NotifBody(
             Text(
                 text = "${item.appName} · $time",
                 color = c.onTileOff.copy(alpha = 0.7f),
-                fontSize = 11.sp,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -338,8 +339,8 @@ internal fun NotifBody(
                 Text(
                     text = item.title,
                     color = c.onTileOff,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
                     maxLines = if (expanded) 3 else 1,
                     overflow = TextOverflow.Ellipsis,
                 )

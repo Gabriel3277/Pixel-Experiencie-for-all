@@ -1,0 +1,17 @@
+package com.pixelexperience.forall.controlcenter.ui
+
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+/** Tokens do painel (Material 3 Expressive): formas e tipografia num só lugar. */
+internal object Pd {
+    val CardRadius = 36.dp
+    val NotifOuter = 28.dp
+    val NotifInner = 8.dp
+
+    val Title = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.2).sp)
+    val Label = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold)
+    val Caption = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold)
+}

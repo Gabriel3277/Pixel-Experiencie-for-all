@@ -144,15 +144,14 @@ internal fun UnifiedPanel(
                 Text(
                     text = "Notificações",
                     color = c.onPanel,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Medium,
+                    style = Pd.Title,
                     modifier = Modifier.weight(1f),
                 )
                 if (hasAccess && canClear) {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
-                            .background(c.tileOff)
+                            .background(c.card)
                             .clickable { NotificationStore.clearAll() }
                             .padding(horizontal = 18.dp, vertical = 10.dp),
                     ) {
@@ -220,10 +219,10 @@ internal fun UnifiedPanel(
                                 canDismiss = { e ->
                                     if (e.footer == 1) e.group.any { it.clearable } else e.item.clearable
                                 },
-                                containerColor = c.tileOff,
+                                containerColor = c.card,
                                 contentColor = c.onTileOff,
-                                outerRadius = 24.dp,
-                                innerRadius = 6.dp,
+                                outerRadius = Pd.NotifOuter,
+                                innerRadius = Pd.NotifInner,
                             ) { e ->
                                 Column {
                                     NotifBody(e.item, c, {
@@ -360,10 +359,10 @@ private fun NotifGroup(
                 itemKey = { it.key },
                 onDismiss = onDismissItem,
                 canDismiss = { it.clearable },
-                containerColor = c.tileOff,
+                containerColor = c.card,
                 contentColor = c.onTileOff,
-                outerRadius = 24.dp,
-                innerRadius = 6.dp,
+                outerRadius = Pd.NotifOuter,
+                innerRadius = Pd.NotifInner,
             ) { item ->
                 NotifBody(item, c, { onOpen(item) })
             }

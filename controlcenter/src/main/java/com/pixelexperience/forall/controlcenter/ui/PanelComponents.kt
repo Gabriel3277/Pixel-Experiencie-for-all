@@ -489,7 +489,7 @@ internal fun WideTile(
             )
             Text(
                 text = subtitle,
-                color = colors.onTileOff.copy(alpha = 0.7f),
+                color = if (active) colors.tileOn else colors.onTileOff.copy(alpha = 0.7f),
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

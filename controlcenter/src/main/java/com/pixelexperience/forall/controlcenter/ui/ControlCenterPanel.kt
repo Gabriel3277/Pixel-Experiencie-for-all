@@ -57,6 +57,7 @@ internal class PanelColors(
     val onTileOn: Color,
     val onTileOff: Color,
     val onPanel: Color,
+    val card: Color,
 )
 
 @Composable
@@ -72,6 +73,7 @@ internal fun rememberPanelColors(): PanelColors {
                 onTileOn = cs.onPrimary,
                 onTileOff = cs.onSurface,
                 onPanel = cs.onSurface,
+                card = lerp(cs.surfaceContainerHigh, cs.secondaryContainer, 0.35f),
             )
         } else {
             PanelColors(
@@ -81,6 +83,7 @@ internal fun rememberPanelColors(): PanelColors {
                 onTileOn = cs.onPrimary,
                 onTileOff = cs.onSurface,
                 onPanel = cs.onSurface,
+                card = lerp(cs.surfaceContainerLowest, cs.secondaryContainer, 0.35f),
             )
         }
     }
@@ -172,8 +175,7 @@ internal fun ControlCard(
                         Text(
                             text = "Editar blocos",
                             color = c.onPanel,
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Medium,
+                            style = Pd.Title,
                             modifier = Modifier.weight(1f),
                         )
                         HeaderButton(
