@@ -28,6 +28,7 @@ enum class ClockStyle(val label: String) {
 
 enum class ClockAlign(val label: String) { START("Esquerda"), CENTER("Centro") }
 enum class ClockColor(val label: String) { DYNAMIC("Dinâmica"), ACCENT("Destaque"), WHITE("Branca") }
+enum class WallpaperFit(val label: String) { FILL("Preencher"), FIT("Ajustar"), TOP("Topo") }
 enum class ShortcutType(val label: String) {
     NONE("Nenhum"), CAMERA("Câmera"), FLASHLIGHT("Lanterna"), DIALER("Telefone"), ALARM("Alarmes"), ASSISTANT("Assistente")
 }
@@ -54,6 +55,8 @@ data class LockSettings(
     val rightShortcut: ShortcutType = ShortcutType.CAMERA,
     val showWeather: Boolean = true,
     val aodEnabled: Boolean = true,
+    val wallpaperFit: WallpaperFit = WallpaperFit.FILL,
+    val showBatteryPercent: Boolean = true,
 )
 
 private val Context.lockStore by preferencesDataStore("pxe_lockscreen")
@@ -80,6 +83,8 @@ private object K {
     val right = stringPreferencesKey("right_shortcut")
     val weather = booleanPreferencesKey("show_weather")
     val aod = booleanPreferencesKey("aod_enabled")
+    val wpFit = stringPreferencesKey("wallpaper_fit")
+    val batPct = booleanPreferencesKey("show_battery_pct")
 }
 
 private inline fun <reified E : Enum<E>> Preferences.enumOf(key: Preferences.Key<String>, def: E): E {
@@ -111,6 +116,8 @@ private fun Preferences.toSettings(): LockSettings {
         rightShortcut = enumOf(K.right, d.rightShortcut),
         showWeather = this[K.weather] ?: d.showWeather,
         aodEnabled = this[K.aod] ?: d.aodEnabled,
+        wallpaperFit = enumOf(K.wpFit, d.wallpaperFit),
+        showBatteryPercent = this[K.batPct] ?: d.showBatteryPercent,
     )
 }
 
@@ -136,6 +143,8 @@ private fun MutablePreferences.write(s: LockSettings) {
     this[K.right] = s.rightShortcut.name
     this[K.weather] = s.showWeather
     this[K.aod] = s.aodEnabled
+    this[K.wpFit] = s.wallpaperFit.name
+    this[K.batPct] = s.showBatteryPercent
 }
 
 /** Fonte única das configurações: estado em memória (instantâneo) + persistência em DataStore (com debounce). */

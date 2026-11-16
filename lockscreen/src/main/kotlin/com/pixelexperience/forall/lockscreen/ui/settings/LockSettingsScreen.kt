@@ -104,6 +104,7 @@ import com.pixelexperience.forall.lockscreen.data.ClockStyle
 import com.pixelexperience.forall.lockscreen.data.LockSettings
 import com.pixelexperience.forall.lockscreen.data.LockSettingsRepository
 import com.pixelexperience.forall.lockscreen.data.ShortcutType
+import com.pixelexperience.forall.lockscreen.data.WallpaperFit
 import com.pixelexperience.forall.lockscreen.data.WallpaperRepository
 import com.pixelexperience.forall.lockscreen.data.WallpaperUi
 import com.pixelexperience.forall.lockscreen.notifications.LockNotification
@@ -242,6 +243,8 @@ fun LockSettingsScreen(onBack: () -> Unit) {
                             contentAlignment = Alignment.Center,
                         ) { Icon(Icons.Filled.AddPhotoAlternate, "Escolher da galeria") }
                     }
+                    Text("Apresentação", style = MaterialTheme.typography.labelLarge)
+                    ChipRow(WallpaperFit.entries, s.wallpaperFit, { it.label }) { v -> set { it.copy(wallpaperFit = v) } }
                     Text(
                         "As cores do relógio e dos cards seguem o papel de parede escolhido.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -311,6 +314,7 @@ fun LockSettingsScreen(onBack: () -> Unit) {
                     ChipRow(ShortcutType.entries, s.leftShortcut, { it.label }) { v -> set { it.copy(leftShortcut = v) } }
                     Text("Direita", style = MaterialTheme.typography.labelLarge)
                     ChipRow(ShortcutType.entries, s.rightShortcut, { it.label }) { v -> set { it.copy(rightShortcut = v) } }
+                    SwitchRow("Mostrar porcentagem da bateria", s.showBatteryPercent) { v -> set { it.copy(showBatteryPercent = v) } }
                 }
                 }
                 else -> Unit

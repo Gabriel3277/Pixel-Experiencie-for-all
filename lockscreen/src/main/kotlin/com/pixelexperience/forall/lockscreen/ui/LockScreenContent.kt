@@ -111,6 +111,13 @@ import com.pixelexperience.forall.lockscreen.notifications.LockNotification
 import com.pixelexperience.forall.lockscreen.media.rememberLockMedia
 import com.pixelexperience.forall.lockscreen.ui.components.MediaPlayerCard
 import com.pixelexperience.forall.lockscreen.ui.components.FingerprintHint
+import com.pixelexperience.forall.lockscreen.ui.components.BatteryStatus
+import com.pixelexperience.forall.lockscreen.ui.components.NextAlarmChip
+import com.pixelexperience.forall.lockscreen.ui.components.FitBackdrop
+import com.pixelexperience.forall.lockscreen.ui.components.alignment
+import com.pixelexperience.forall.lockscreen.ui.components.contentScale
+import com.pixelexperience.forall.lockscreen.data.WallpaperFit
+import androidx.compose.ui.platform.LocalView
 import com.pixelexperience.forall.lockscreen.ui.clock.LockClock
 import com.pixelexperience.forall.lockscreen.widget.HostedClockWidget
 import com.pixelexperience.forall.lockscreen.ui.components.Backdrop
@@ -188,6 +195,7 @@ fun LockScreenContent(
 ) {
     val ctx = LocalContext.current
     val density = LocalDensity.current
+    val view = LocalView.current
     val palette = wallpaper?.palette ?: LockPalette.Default
     // Dynamic Color a partir do wallpaper: todos os papéis (clock, cards, atalhos) vêm do mesmo esquema tonal
     val dark = isSystemInDarkTheme()
@@ -224,6 +232,13 @@ fun LockScreenContent(
         }
     }
 
+    fun confirmHaptic() {
+        view.performHapticFeedback(
+            if (android.os.Build.VERSION.SDK_INT >= 30) android.view.HapticFeedbackConstants.CONFIRM
+            else android.view.HapticFeedbackConstants.CONTEXT_CLICK
+        )
+    }
+
     suspend fun settle(vy: Float) {
         if (preview || unlocking) return
         if (drag.value < -unlockDist * 0.45f || (drag.value < 0f && vy < -1800f)) {
@@ -233,7 +248,7 @@ fun LockScreenContent(
                 if (!ok) {
                     unlocking = false
                     scope.launch { drag.animateTo(0f, LockMotion.bouncy()) }
-                }
+                } else confirmHaptic()
             }
         } else if (drag.value != 0f) {
             drag.animateTo(0f, LockMotion.bouncy())
@@ -327,9 +342,11 @@ fun LockScreenContent(
             if (w != null) {
                 val blurDp = settings.bgBlur * 36f
                 Box(Modifier.fillMaxSize()) {
+                    if (settings.wallpaperFit == WallpaperFit.FIT) FitBackdrop(w.image, preview)
                     // camada 1: wallpaper com blur leve + profundidade (escala cresce ao arrastar)
                     Image(
-                        bitmap = w.image, contentDescription = null, contentScale = ContentScale.Crop,
+                        bitmap = w.image, contentDescription = null,
+                        contentScale = settings.wallpaperFit.contentScale(), alignment = settings.wallpaperFit.alignment(),
                         modifier = Modifier.fillMaxSize().graphicsLayer {
                             val p = (-drag.value / unlockDist).coerceIn(0f, 1f)
                             val sc = 1.06f + 0.07f * p
@@ -342,7 +359,8 @@ fun LockScreenContent(
                     // camada 2: blur forte com máscara progressiva (transparente no topo -> opaco embaixo, onde ficam os cards)
                     if (!preview && blurDp > 1f) {
                         Image(
-                            bitmap = w.image, contentDescription = null, contentScale = ContentScale.Crop,
+                            bitmap = w.image, contentDescription = null,
+                            contentScale = settings.wallpaperFit.contentScale(), alignment = settings.wallpaperFit.alignment(),
                             modifier = Modifier.fillMaxSize()
                                 .graphicsLayer {
                                     val p = (-drag.value / unlockDist).coerceIn(0f, 1f)
@@ -435,6 +453,10 @@ fun LockScreenContent(
                         )
                     },
                 )
+                NextAlarmChip(
+                    tint = clockTint, align = settings.clockAlign,
+                    modifier = Modifier.layerFx(e1::value, dragFn, 0.35f, 1.4f, distFn),
+                )
                 Spacer(Modifier.height(16.dp))
                 MediaPlayerCard(
                     media = media,
@@ -492,17 +514,7 @@ fun LockScreenContent(
                 ) {
                     ShortcutSlot(settings.leftShortcut, torchOn, scheme, settings, onShortcut)
                     Box(Modifier.weight(1f).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
-                        val bat = rememberBatteryText()
-                        if (bat != null) {
-                            Text(
-                                bat, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                style = TextStyle(
-                                    fontFamily = UiFont, fontSize = 15.sp, letterSpacing = 0.1.sp,
-                                    color = Color.White.copy(alpha = 0.92f),
-                                    shadow = Shadow(Color.Black.copy(alpha = 0.22f), Offset(0f, 1f), 12f),
-                                ),
-                            )
-                        }
+                        BatteryStatus(showPercent = settings.showBatteryPercent, scheme = scheme)
                     }
                     ShortcutSlot(settings.rightShortcut, torchOn, scheme, settings, onShortcut)
                 }

@@ -11,6 +11,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -55,7 +56,7 @@ fun FingerprintHint(visible: Boolean, color: Color, modifier: Modifier = Modifie
             visible = visible,
             modifier = Modifier.align(Alignment.TopEnd).offset(y = maxHeight * HINT_Y),
             enter = fadeIn(tween(600, delayMillis = 500)) + slideInHorizontally(tween(600, delayMillis = 500)) { it },
-            exit = fadeOut(tween(150)),
+            exit = fadeOut(tween(220)) + scaleOut(tween(220), targetScale = 1.6f),
         ) {
             val dx = if (resumed) {
                 rememberInfiniteTransition(label = "fp").animateFloat(
