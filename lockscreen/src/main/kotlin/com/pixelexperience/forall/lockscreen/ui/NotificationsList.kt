@@ -5,6 +5,7 @@ import android.content.Context
 import android.text.format.DateFormat
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
@@ -19,6 +20,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -28,24 +31,25 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -55,15 +59,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -72,37 +80,42 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pixelexperience.forall.lockscreen.notifications.LockAction
 import com.pixelexperience.forall.lockscreen.notifications.LockNotification
 import com.pixelexperience.forall.lockscreen.ui.components.GlassCard
 import com.pixelexperience.forall.lockscreen.ui.theme.LockMotion
-import com.pixelexperience.forall.lockscreen.ui.theme.lockFont
 import com.pixelexperience.forall.lockscreen.ui.theme.lockColorScheme
+import com.pixelexperience.forall.lockscreen.ui.theme.lockFont
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.min
 import kotlin.math.sign
 
 private val OuterCorner = 28.dp
 private val InnerCorner = 6.dp
-private val CardGap = 4.dp
+private val CardGap = 3.dp
 
-/** Não nulo = estilo vidro (valor = opacidade do tint). Nulo = cartões sólidos. */
+/** Nao nulo = estilo vidro (valor = opacidade do tint). Nulo = cartoes solidos. */
 private val LocalGlassOpacity = staticCompositionLocalOf<Float?> { null }
 
 private class Group(val id: String, val appName: String, val items: List<LockNotification>)
 
-/** Linha da lista: grupo de notificações, rótulo de seção ou a pílula de ícones das silenciosas. */
+/** Linha da lista: grupo de notificacoes, rotulo de secao ou a pilula de icones das silenciosas. */
 private class Entry(
     val key: String,
     val group: Group? = null,
@@ -112,15 +125,18 @@ private class Entry(
     val last: Boolean = false,
 )
 
-/** Cores sólidas e opacas dos cartões, derivadas do tom (surfaceContainerHigh) e do accent da lockscreen. */
+/** Estado compartilhado do arrasto: o item arrastado move os vizinhos em onda (M3 Expressive). */
+private class SwipeChain {
+    var index by mutableIntStateOf(-1)
+    val x = Animatable(0f)
+}
+
+/** Papeis de cor Material You dos cartoes. */
 private class Pal(val tint: Color, val accent: Color, sc: ColorScheme) {
-    private val dark = tint.luminance() <= 0.5f
     val onCard: Color = sc.onSurface
     val onCardVariant: Color = sc.onSurfaceVariant
     val onAccent: Color = sc.onPrimary
     val chip: Color = sc.surfaceContainerHighest
-    val stack1: Color = if (dark) sc.surfaceContainer else sc.surfaceContainerHighest
-    val stack2: Color = if (dark) sc.surfaceContainerLow else sc.surfaceDim
     val clearBg: Color = sc.primaryContainer
     val onClear: Color = sc.onPrimaryContainer
     private val prio: Color = sc.secondaryContainer
@@ -133,7 +149,7 @@ private class Pal(val tint: Color, val accent: Color, sc: ColorScheme) {
 
 private fun isPt() = Locale.getDefault().language == "pt"
 
-/** Cartão sólido: cor opaca, sem blur, sem transparência, sem degradê. */
+/** Cartao solido: cor opaca (ou vidro, quando ativado nas configuracoes). */
 @Composable
 private fun SolidCard(modifier: Modifier, shape: Shape, color: Color, content: @Composable BoxScope.() -> Unit) {
     val glass = LocalGlassOpacity.current
@@ -144,13 +160,22 @@ private fun SolidCard(modifier: Modifier, shape: Shape, color: Color, content: @
     }
 }
 
+@Composable
+private fun rememberCardShape(topCorner: Dp, bottomCorner: Dp): Shape {
+    val top by animateDpAsState(topCorner, LockMotion.fastSpatial(), label = "top")
+    val bottom by animateDpAsState(bottomCorner, LockMotion.fastSpatial(), label = "bottom")
+    return RoundedCornerShape(
+        topStart = top.coerceAtLeast(0.dp), topEnd = top.coerceAtLeast(0.dp),
+        bottomEnd = bottom.coerceAtLeast(0.dp), bottomStart = bottom.coerceAtLeast(0.dp),
+    )
+}
+
 /**
- * Central de notificações da tela de bloqueio (estilo Pixel / Android 17).
- * - Cartões sólidos e colados (4dp): só o topo do primeiro e o fim do último têm o canto grande.
- * - Grupos por app: pilha recolhida com contador; expandida mostra cada notificação num cartão próprio.
- * - Silenciosas: pílula com ícones dos apps; ao tocar abre a seção.
- * - Cada cartão: deslizar para dispensar, expandir texto longo, imagem e ações.
- * (opacity é mantido só por compatibilidade com a chamada atual e não é mais usado.)
+ * Central de notificacoes da tela de bloqueio (estilo Android 14 / Pixel + movimento Material 3 Expressive).
+ * - Lista segmentada: cartoes colados, so as pontas tem canto grande.
+ * - Ao deslizar um item, os vizinhos acompanham em onda e os cantos se transformam; ao soltar, mola.
+ * - Grupo: um cartao com cabecalho (icone, app, contador) e uma linha por notificacao.
+ * - Silenciosas: pilula de icones; ao abrir, secao com X. Rodape: Gerenciar e Limpar tudo.
  */
 @Composable
 fun NotificationsList(
@@ -167,6 +192,7 @@ fun NotificationsList(
     onAction: (LockAction) -> Unit = {},
     glass: Boolean = false,
     scheme: ColorScheme? = null,
+    onManage: () -> Unit = {},
 ) {
     val pal = remember(tint, accent, scheme) {
         Pal(tint, accent, scheme ?: lockColorScheme(accent, tint.luminance() <= 0.5f))
@@ -174,6 +200,8 @@ fun NotificationsList(
     var showQuiet by rememberSaveable { mutableStateOf(false) }
     val quiet = remember(items) { items.filter { it.importance < NotificationManager.IMPORTANCE_DEFAULT } }
     val quietApps = remember(quiet) { quiet.distinctBy { it.packageName } }
+    val chain = remember { SwipeChain() }
+    var clearing by remember { mutableStateOf(false) }
 
     val entries = remember(items, grouped, showQuiet) {
         fun build(prefix: String, list: List<LockNotification>): List<Entry> {
@@ -197,44 +225,105 @@ fun NotificationsList(
         }
     }
 
-    CompositionLocalProvider(LocalGlassOpacity provides (if (glass) opacity else null)) {
-    LazyColumn(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(CardGap),
-        contentPadding = PaddingValues(top = 4.dp, bottom = 28.dp),
-        userScrollEnabled = !preview,
-    ) {
-        items(entries, key = { it.key }) { e ->
-            val h = e.header
-            val g = e.group
-            when {
-                e.pill -> QuietPill(quietApps, pal, Modifier.animateItem()) { showQuiet = true }
-                h != null -> SectionLabel(h, pal, Modifier.animateItem()) { showQuiet = false }
-                g != null -> GroupBlock(g, pal, e.first, e.last, onOpen, onDismiss, onAction, Modifier.animateItem())
-            }
+    // Limpar tudo em cascata: cada cartao desliza para fora em sequencia e so depois o sistema limpa
+    LaunchedEffect(clearing) {
+        if (clearing) {
+            delay(min(entries.size, 8) * 45L + 280L)
+            onClearAll()
+            clearing = false
         }
-        if (items.any { it.clearable }) {
-            item(key = "clear_all") {
-                Box(Modifier.fillMaxWidth().padding(top = 8.dp).animateItem(), contentAlignment = Alignment.Center) {
-                    SolidCard(Modifier, RoundedCornerShape(50), pal.clearBg) {
-                        Text(
-                            if (isPt()) "Limpar tudo" else "Clear all",
-                            modifier = Modifier.clickable { onClearAll() }.padding(horizontal = 24.dp, vertical = 12.dp),
-                            color = pal.onClear,
-                            fontSize = 13.sp,
-                            fontFamily = lockFont(600),
-                            maxLines = 1,
-                        )
-                    }
+    }
+
+    CompositionLocalProvider(LocalGlassOpacity provides (if (glass) opacity else null)) {
+        LazyColumn(
+            modifier = modifier.fadeEdges(),
+            verticalArrangement = Arrangement.spacedBy(CardGap),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 28.dp),
+            userScrollEnabled = !preview,
+        ) {
+            itemsIndexed(entries, key = { _, e -> e.key }) { idx, e ->
+                val h = e.header
+                val g = e.group
+                val canClear = g?.items?.any { it.clearable } == true
+                val fx = Modifier
+                    .animateItem(
+                        fadeInSpec = LockMotion.effects<Float>(),
+                        placementSpec = LockMotion.spatial<IntOffset>(),
+                        fadeOutSpec = LockMotion.effects<Float>(),
+                    )
+                    .chainWave(chain, idx)
+                    .clearSlide(clearing && canClear, min(idx, 8))
+                when {
+                    e.pill -> QuietPill(quietApps, pal, fx) { showQuiet = true }
+                    h != null -> SectionLabel(h, pal, fx) { showQuiet = false }
+                    g != null -> GroupBlock(g, pal, idx, e.first, e.last, chain, onOpen, onDismiss, onAction, fx)
+                }
+            }
+            if (items.isNotEmpty()) {
+                item(key = "footer") {
+                    ListFooter(
+                        pal = pal,
+                        showClear = items.any { it.clearable },
+                        onManage = onManage,
+                        onClear = { clearing = true },
+                        modifier = Modifier.animateItem(
+                            fadeInSpec = LockMotion.effects<Float>(),
+                            placementSpec = LockMotion.spatial<IntOffset>(),
+                            fadeOutSpec = LockMotion.effects<Float>(),
+                        ),
+                    )
                 }
             }
         }
     }
+}
+
+/** Esmaece suavemente as bordas superior e inferior da lista (sem corte abrupto). */
+private fun Modifier.fadeEdges(): Modifier = this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        drawRect(
+            Brush.verticalGradient(
+                0f to Color.Transparent, 0.02f to Color.Black, 0.95f to Color.Black, 1f to Color.Transparent,
+            ),
+            blendMode = BlendMode.DstIn,
+        )
+    }
+
+/** Onda: os itens vizinhos acompanham o arrasto com intensidade que cai com a distancia. */
+private fun Modifier.chainWave(chain: SwipeChain, myIndex: Int): Modifier = graphicsLayer {
+    val i = chain.index
+    if (i >= 0 && i != myIndex) {
+        val d = abs(myIndex - i)
+        val f = (0.55f - 0.12f * d).coerceAtLeast(0f)
+        val lim = 56.dp.toPx()
+        translationX = (chain.x.value * f).coerceIn(-lim, lim)
     }
 }
 
-/** Deslizar para os lados dispensa; se o sistema não remover a notificação, o card volta ao lugar. */
-private fun Modifier.swipeAway(enabled: Boolean, onDismissed: () -> Unit): Modifier = composed {
+/** Limpar tudo: o cartao espera a sua vez (order) e desliza para fora. */
+private fun Modifier.clearSlide(clearing: Boolean, order: Int): Modifier = composed {
+    val x = remember { Animatable(0f) }
+    var w by remember { mutableIntStateOf(1) }
+    LaunchedEffect(clearing) {
+        if (clearing) {
+            delay(order * 45L)
+            x.animateTo(w.toFloat(), tween(220))
+        } else if (x.value != 0f) {
+            x.animateTo(0f, LockMotion.spatial())
+        }
+    }
+    this
+        .onSizeChanged { w = it.width.coerceAtLeast(1) }
+        .graphicsLayer {
+            translationX = x.value
+            alpha = 1f - (x.value / w).coerceIn(0f, 1f)
+        }
+}
+
+/** Deslizar para os lados dispensa; se o sistema nao remover a notificacao, o card volta ao lugar. */
+private fun Modifier.swipeAway(enabled: Boolean, chain: SwipeChain?, index: Int, onDismissed: () -> Unit): Modifier = composed {
     val offset = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     var width by remember { mutableIntStateOf(1) }
@@ -249,12 +338,19 @@ private fun Modifier.swipeAway(enabled: Boolean, onDismissed: () -> Unit): Modif
             orientation = Orientation.Horizontal,
             enabled = enabled,
             state = rememberDraggableState { d ->
-                scope.launch(start = CoroutineStart.UNDISPATCHED) { offset.snapTo(offset.value + d) }
+                scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    offset.snapTo(offset.value + d)
+                    if (chain != null) {
+                        chain.index = index
+                        chain.x.snapTo(offset.value)
+                    }
+                }
             },
             onDragStopped = { v ->
                 val moved = abs(offset.value) > 8f
                 val far = abs(offset.value) > width * 0.35f
                 val fast = abs(v) > 1400f && (!moved || sign(v) == sign(offset.value))
+                if (chain != null) scope.launch { chain.x.animateTo(0f, LockMotion.bouncy()) }
                 if (far || fast) {
                     val dir = if (moved) sign(offset.value) else sign(v)
                     offset.animateTo(dir * width, tween(180))
@@ -272,22 +368,35 @@ private fun Modifier.swipeAway(enabled: Boolean, onDismissed: () -> Unit): Modif
 private fun GroupBlock(
     g: Group,
     pal: Pal,
+    index: Int,
     first: Boolean,
     last: Boolean,
+    chain: SwipeChain,
     onOpen: (LockNotification) -> Unit,
     onDismiss: (String) -> Unit,
     onAction: (LockAction) -> Unit,
     modifier: Modifier,
 ) {
+    // vizinhos do item arrastado "soltam" da lista: o canto voltado para ele fica grande
+    val topC by remember(first, index, chain) {
+        derivedStateOf {
+            val d = chain.index >= 0 && abs(chain.x.value) > 8f
+            if (first || (d && (index == chain.index || index == chain.index + 1))) OuterCorner else InnerCorner
+        }
+    }
+    val bottomC by remember(last, index, chain) {
+        derivedStateOf {
+            val d = chain.index >= 0 && abs(chain.x.value) > 8f
+            if (last || (d && (index == chain.index || index == chain.index - 1))) OuterCorner else InnerCorner
+        }
+    }
     val firstN = g.items.first()
-    val topC = if (first) OuterCorner else InnerCorner
-    val bottomC = if (last) OuterCorner else InnerCorner
 
     if (g.items.size == 1) {
         NotificationCard(
             n = firstN, topCorner = topC, bottomCorner = bottomC, pal = pal,
             onOpen = onOpen, dismissible = firstN.clearable, onDismiss = { onDismiss(firstN.key) }, onAction = onAction,
-            modifier = modifier,
+            modifier = modifier, chain = chain, index = index,
         )
         return
     }
@@ -301,31 +410,15 @@ private fun GroupBlock(
         modifier = modifier.fillMaxWidth(),
         transitionSpec = {
             fadeIn(LockMotion.effects()) togetherWith fadeOut(LockMotion.effects()) using
-                SizeTransform(clip = true) { _, _ -> LockMotion.spatial() }
+                SizeTransform(clip = false) { _, _ -> LockMotion.spatial() }
         },
         label = "group",
     ) { isExpanded ->
         if (!isExpanded) {
-            // pilha recolhida: cartão mais recente com cartões menores, mais escuros, "espiando" por baixo
-            val peeks = (g.items.size - 1).coerceAtMost(2)
-            Box(Modifier.fillMaxWidth().swipeAway(canDismissGroup, dismissGroup)) {
-                if (peeks >= 2) {
-                    SolidCard(
-                        Modifier.align(Alignment.BottomCenter).padding(horizontal = 26.dp).fillMaxWidth().height(40.dp),
-                        RoundedCornerShape(OuterCorner), pal.stack2,
-                    ) {}
-                }
-                SolidCard(
-                    Modifier.align(Alignment.BottomCenter).padding(horizontal = 13.dp).fillMaxWidth().height(48.dp),
-                    RoundedCornerShape(OuterCorner), pal.stack1,
-                ) {}
-                NotificationCard(
-                    n = firstN, topCorner = topC, bottomCorner = OuterCorner, pal = pal,
-                    onOpen = onOpen, dismissible = false, onDismiss = {}, onAction = onAction,
-                    modifier = Modifier.padding(bottom = (peeks * 8).dp),
-                    groupCount = g.items.size, onGroupToggle = { expanded = true },
-                )
-            }
+            GroupSummaryCard(
+                g = g, topCorner = topC, bottomCorner = bottomC, pal = pal, chain = chain, index = index,
+                canDismiss = canDismissGroup, onDismissAll = dismissGroup, onExpand = { expanded = true },
+            )
         } else {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(CardGap)) {
                 GroupHeader(g, pal, canDismissGroup, dismissGroup) { expanded = false }
@@ -337,6 +430,7 @@ private fun GroupBlock(
                             bottomCorner = if (i == g.items.lastIndex && last) OuterCorner else InnerCorner,
                             pal = pal,
                             onOpen = onOpen, dismissible = n.clearable, onDismiss = { onDismiss(n.key) }, onAction = onAction,
+                            chain = chain, index = index,
                         )
                     }
                 }
@@ -345,7 +439,71 @@ private fun GroupBlock(
     }
 }
 
-/** Cabeçalho do grupo expandido: ícone, "App · N", botão Limpar e seta de recolher. */
+/** Grupo recolhido (Android 14): cabecalho com icone, app e contador, mais uma linha "Titulo texto" por notificacao. */
+@Composable
+private fun GroupSummaryCard(
+    g: Group,
+    topCorner: Dp,
+    bottomCorner: Dp,
+    pal: Pal,
+    chain: SwipeChain,
+    index: Int,
+    canDismiss: Boolean,
+    onDismissAll: () -> Unit,
+    onExpand: () -> Unit,
+) {
+    val shape = rememberCardShape(topCorner, bottomCorner)
+    val src = remember { MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    val main = pal.onCard
+    val sub = pal.onCardVariant
+    val bg by animateColorAsState(if (pressed) lerp(pal.tint, main, 0.10f) else pal.tint, LockMotion.effects(), label = "press")
+    val scale by animateFloatAsState(if (pressed) 0.985f else 1f, LockMotion.fastSpatial(), label = "pressScale")
+    val head = g.items.first()
+
+    SolidCard(
+        Modifier.fillMaxWidth().swipeAway(canDismiss, chain, index, onDismissAll).graphicsLayer { scaleX = scale; scaleY = scale },
+        shape, bg,
+    ) {
+        Column(
+            Modifier.fillMaxWidth()
+                .clickable(interactionSource = src, indication = null) { onExpand() }
+                .padding(start = 16.dp, end = 10.dp, top = 12.dp, bottom = 12.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                AppIcon(head, 24.dp, pal)
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    g.appName, color = sub, fontSize = 13.sp, fontFamily = lockFont(600),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+                )
+                CountChevronPill(g.items.size, 0f, pal.chip, main, onExpand)
+            }
+            g.items.take(3).forEach { n ->
+                Text(
+                    text = buildAnnotatedString {
+                        if (!n.hidden && n.title.isNotBlank()) {
+                            withStyle(SpanStyle(fontFamily = lockFont(600), color = main)) { append(n.title) }
+                            append("  ")
+                        }
+                        append(n.text)
+                    },
+                    color = sub, fontSize = 14.sp, fontFamily = lockFont(400),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+            }
+            if (g.items.size > 3) {
+                Text(
+                    "+${g.items.size - 3}", color = sub, fontSize = 12.sp, fontFamily = lockFont(600),
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        }
+    }
+}
+
+/** Cabecalho do grupo expandido: icone, "App - N", botao Limpar e seta de recolher. */
 @Composable
 private fun GroupHeader(g: Group, pal: Pal, canDismiss: Boolean, onDismissAll: () -> Unit, onCollapse: () -> Unit) {
     val sh = Shadow(Color.Black.copy(alpha = 0.22f), Offset(0f, 1f), 12f)
@@ -388,103 +546,91 @@ private fun NotificationCard(
     onDismiss: () -> Unit,
     onAction: (LockAction) -> Unit,
     modifier: Modifier = Modifier,
-    groupCount: Int = 0,
-    onGroupToggle: (() -> Unit)? = null,
+    chain: SwipeChain? = null,
+    index: Int = -1,
 ) {
     val ctx = LocalContext.current
     var textExpanded by rememberSaveable(n.key) { mutableStateOf(false) }
-    val silent = n.importance < NotificationManager.IMPORTANCE_DEFAULT
     val priority = n.importance >= NotificationManager.IMPORTANCE_HIGH
     val longContent = !n.hidden && (
         n.bigText.length > n.text.length + 3 || n.text.length > 70 || n.picture != null || n.actions.isNotEmpty()
         )
-    val showChevron = onGroupToggle != null || longContent
-    val expandedText = textExpanded && onGroupToggle == null
+    val shape = rememberCardShape(topCorner, bottomCorner)
+    val rot by animateFloatAsState(if (textExpanded) 180f else 0f, LockMotion.spatial(), label = "chevron")
 
-    val top by animateDpAsState(topCorner, LockMotion.fastSpatial(), label = "top")
-    val bottom by animateDpAsState(bottomCorner, LockMotion.fastSpatial(), label = "bottom")
-    val shape = RoundedCornerShape(
-        topStart = top.coerceAtLeast(0.dp), topEnd = top.coerceAtLeast(0.dp),
-        bottomEnd = bottom.coerceAtLeast(0.dp), bottomStart = bottom.coerceAtLeast(0.dp),
-    )
-    val rot by animateFloatAsState(if (expandedText) 180f else 0f, LockMotion.spatial(), label = "chevron")
-
-    // cores sólidas: prioritária puxa o accent; os textos secundários são misturas opacas (sem alpha)
     val cardColor = pal.card(priority)
     val main = pal.textOn(priority)
-    val appNameColor = pal.variantOn(priority)
-    val timeColor = pal.variantOn(priority)
-    val bodyColor = pal.variantOn(priority)
+    val sub = pal.variantOn(priority)
     val chipColor = pal.chipOn(priority)
 
+    // realce ao tocar: o cartao clareia e encolhe um pouco, com mola
+    val src = remember { MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    val bg by animateColorAsState(if (pressed) lerp(cardColor, main, 0.10f) else cardColor, LockMotion.effects(), label = "press")
+    val scale by animateFloatAsState(if (pressed) 0.985f else 1f, LockMotion.fastSpatial(), label = "pressScale")
+
+    val pic = n.picture
+    val thumb = pic != null && !textExpanded && !n.hidden
+
     SolidCard(
-        modifier = modifier.fillMaxWidth().swipeAway(dismissible, onDismiss)
-            .then(
-                if (LocalGlassOpacity.current == null) {
-                    Modifier.shadow(2.dp, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.18f), spotColor = Color.Black.copy(alpha = 0.18f))
-                } else Modifier,
-            ),
-        shape = shape, color = cardColor,
+        modifier = modifier.fillMaxWidth()
+            .swipeAway(dismissible, chain, index, onDismiss)
+            .graphicsLayer { scaleX = scale; scaleY = scale },
+        shape = shape, color = bg,
     ) {
         Row(
             Modifier.fillMaxWidth()
-                .clickable { onOpen(n) }
-                .padding(start = 16.dp, end = 10.dp, top = 12.dp, bottom = 14.dp)
+                .clickable(interactionSource = src, indication = null) { onOpen(n) }
+                .padding(start = 16.dp, end = 10.dp, top = 14.dp, bottom = 14.dp)
                 .animateContentSize(LockMotion.spatial()),
+            verticalAlignment = Alignment.Top,
         ) {
+            AppIcon(n, 24.dp, pal)
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                // linha do app: ícone redondo · nome · contador · tempo
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    AppIcon(n, 20.dp, pal)
-                    Spacer(Modifier.width(8.dp))
+                if (textExpanded) {
                     Text(
-                        n.appName, color = appNameColor, fontSize = 12.sp,
-                        fontFamily = lockFont(600), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        n.appName, color = sub, fontSize = 12.sp, fontFamily = lockFont(600),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        n.title.ifBlank { n.appName }, color = main, fontSize = 15.sp, fontFamily = lockFont(600),
+                        maxLines = if (textExpanded) 2 else 1, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
-                    if (groupCount > 1) {
-                        Spacer(Modifier.width(6.dp))
-                        CountPill(groupCount, chipColor, main)
-                    }
                     Text(
-                        "  ·  " + relTime(ctx, n.postTime), color = timeColor, fontSize = 12.sp,
+                        "  ·  " + relTime(ctx, n.postTime), color = sub, fontSize = 12.sp,
                         fontFamily = lockFont(400), maxLines = 1, softWrap = false,
                     )
                 }
                 if (n.hidden) {
-                    Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.Lock, null, tint = bodyColor, modifier = Modifier.size(15.dp))
+                    Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.Lock, null, tint = sub, modifier = Modifier.size(15.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            n.text, color = bodyColor, fontSize = 14.sp,
+                            n.text, color = sub, fontSize = 14.sp,
                             fontFamily = lockFont(400), maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                     }
                 } else {
-                    if (n.title.isNotBlank()) {
-                        Text(
-                            n.title, color = main, fontSize = 15.sp, fontFamily = lockFont(600),
-                            maxLines = if (expandedText) 2 else 1, overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-                        )
-                    }
-                    val body = if (expandedText && n.bigText.isNotBlank()) n.bigText else n.text
+                    val body = if (textExpanded && n.bigText.isNotBlank()) n.bigText else n.text
                     if (body.isNotBlank()) {
                         Text(
-                            body, color = bodyColor, fontSize = 14.sp, lineHeight = 20.sp,
-                            fontFamily = lockFont(400), maxLines = if (expandedText) 8 else 2, overflow = TextOverflow.Ellipsis,
+                            body, color = sub, fontSize = 14.sp, lineHeight = 20.sp,
+                            fontFamily = lockFont(400), maxLines = if (textExpanded) 8 else 1, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
                         )
                     }
-                    val pic = n.picture
-                    if (expandedText && pic != null) {
+                    if (textExpanded && pic != null) {
                         val ratio = (pic.width.toFloat() / pic.height.coerceAtLeast(1)).coerceIn(1f, 2.2f)
                         Image(
                             bitmap = pic, contentDescription = null, contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxWidth().padding(top = 10.dp).aspectRatio(ratio).clip(RoundedCornerShape(16.dp)),
                         )
                     }
-                    if (expandedText && n.actions.isNotEmpty()) {
+                    if (textExpanded && n.actions.isNotEmpty()) {
                         Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             n.actions.forEach { a ->
                                 Box(
@@ -503,41 +649,53 @@ private fun NotificationCard(
                     }
                 }
             }
-            if (showChevron) {
+            if (thumb && pic != null) {
+                Spacer(Modifier.width(10.dp))
+                Image(
+                    bitmap = pic, contentDescription = null, contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(46.dp).clip(RoundedCornerShape(14.dp)),
+                )
+            }
+            if (longContent) {
                 Spacer(Modifier.width(8.dp))
                 ChevronButton(
                     rotation = rot,
-                    description = if (expandedText) (if (isPt()) "Recolher" else "Collapse") else (if (isPt()) "Expandir" else "Expand"),
+                    description = if (textExpanded) (if (isPt()) "Recolher" else "Collapse") else (if (isPt()) "Expandir" else "Expand"),
                     bg = chipColor, fg = main,
-                    onClick = { if (onGroupToggle != null) onGroupToggle() else textExpanded = !textExpanded },
+                    onClick = { textExpanded = !textExpanded },
                 )
             }
         }
     }
 }
 
-/** Rótulo "Silenciosas" com seta para recolher de volta para a pílula de ícones. */
+/** Rotulo "Silenciosas" com X para voltar a pilula de icones. */
 @Composable
 private fun SectionLabel(text: String, pal: Pal, modifier: Modifier = Modifier, onCollapse: () -> Unit) {
     Row(
-        modifier.fillMaxWidth().padding(start = 16.dp, top = 8.dp, end = 4.dp),
+        modifier.fillMaxWidth().padding(start = 16.dp, top = 14.dp, end = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text, modifier = Modifier.weight(1f),
             style = TextStyle(
-                color = Color.White, fontSize = 13.sp, fontFamily = lockFont(600),
+                color = Color.White, fontSize = 14.sp, fontFamily = lockFont(600),
                 shadow = Shadow(Color.Black.copy(alpha = 0.22f), Offset(0f, 1f), 12f),
             ),
         )
-        ChevronButton(
-            rotation = 180f, description = if (isPt()) "Recolher" else "Collapse",
-            bg = pal.tint, fg = pal.onCard, onClick = onCollapse,
-        )
+        Box(
+            Modifier.size(36.dp).clip(CircleShape).background(pal.tint).clickable(onClick = onCollapse),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Rounded.Close, if (isPt()) "Fechar" else "Close", tint = pal.onCard,
+                modifier = Modifier.size(20.dp),
+            )
+        }
     }
 }
 
-/** Pílula sólida com os ícones dos apps das notificações silenciosas (como no Pixel). */
+/** Pilula com os icones dos apps das notificacoes silenciosas (como no Pixel). */
 @Composable
 private fun QuietPill(apps: List<LockNotification>, pal: Pal, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(modifier.fillMaxWidth().padding(top = 8.dp)) {
@@ -563,13 +721,44 @@ private fun QuietPill(apps: List<LockNotification>, pal: Pal, modifier: Modifier
     }
 }
 
+/** Rodape do Android 14: Gerenciar (esquerda) e Limpar tudo (direita). */
 @Composable
-private fun CountPill(count: Int, bg: Color, fg: Color) {
-    Box(
-        Modifier.clip(CircleShape).background(bg).padding(horizontal = 7.dp, vertical = 1.dp),
-        contentAlignment = Alignment.Center,
+private fun ListFooter(pal: Pal, showClear: Boolean, onManage: () -> Unit, onClear: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier.fillMaxWidth().padding(top = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("$count", color = fg, fontSize = 11.sp, fontFamily = lockFont(700), maxLines = 1)
+        FooterPill(if (isPt()) "Gerenciar" else "Manage", pal.tint, pal.onCard, onManage)
+        if (showClear) FooterPill(if (isPt()) "Limpar tudo" else "Clear all", pal.clearBg, pal.onClear, onClear)
+    }
+}
+
+@Composable
+private fun FooterPill(text: String, bg: Color, fg: Color, onClick: () -> Unit) {
+    val src = remember { MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.94f else 1f, LockMotion.fastSpatial(), label = "footerPress")
+    SolidCard(Modifier.graphicsLayer { scaleX = scale; scaleY = scale }, RoundedCornerShape(50), bg) {
+        Text(
+            text,
+            modifier = Modifier.clickable(interactionSource = src, indication = null, onClick = onClick)
+                .padding(horizontal = 24.dp, vertical = 14.dp),
+            color = fg, fontSize = 14.sp, fontFamily = lockFont(600), maxLines = 1,
+        )
+    }
+}
+
+/** Pilula "N + seta" do grupo, como no Android 14. */
+@Composable
+private fun CountChevronPill(count: Int, rotation: Float, bg: Color, fg: Color, onClick: () -> Unit) {
+    Row(
+        Modifier.clip(CircleShape).background(bg).clickable(onClick = onClick)
+            .padding(start = 12.dp, end = 6.dp, top = 5.dp, bottom = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("$count", color = fg, fontSize = 14.sp, fontFamily = lockFont(600), maxLines = 1)
+        Icon(Icons.Filled.KeyboardArrowDown, null, tint = fg, modifier = Modifier.size(22.dp).rotate(rotation))
     }
 }
 

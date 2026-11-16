@@ -173,6 +173,7 @@ fun LockScreenContent(
     modifier: Modifier = Modifier,
     notificationAccess: Boolean = true,
     onGrantNotificationAccess: () -> Unit = {},
+    onManageNotifications: () -> Unit = {},
     unlockSignal: Boolean = false,
     onUnlockAnimated: () -> Unit = {},
     preview: Boolean = false,
@@ -448,6 +449,7 @@ fun LockScreenContent(
                     NotificationsList(
                         items = shown,
                         scheme = scheme,
+                        onManage = onManageNotifications,
                         grouped = settings.groupNotifications,
                         glass = settings.glassNotifications,
                         opacity = settings.cardOpacity,

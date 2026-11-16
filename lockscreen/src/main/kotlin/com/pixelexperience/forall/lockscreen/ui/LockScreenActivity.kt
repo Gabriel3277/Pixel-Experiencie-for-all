@@ -80,6 +80,7 @@ class LockScreenActivity : ComponentActivity() {
                     torchOn = torch,
                     notificationAccess = notifAccess.value,
                     onGrantNotificationAccess = { launchAfterUnlock(LockScreenModule.notificationAccessIntent(this@LockScreenActivity)) },
+                    onManageNotifications = { launchAfterUnlock(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_SETTINGS)) },
                     unlockSignal = unlockSignal.value,
                     onUnlockAnimated = { if (!isFinishing) finishAndRemoveTask() },
                     onShortcut = { runShortcut(it) },
