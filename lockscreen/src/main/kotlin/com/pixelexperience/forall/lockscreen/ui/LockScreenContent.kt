@@ -110,6 +110,7 @@ import com.pixelexperience.forall.lockscreen.notifications.LockAction
 import com.pixelexperience.forall.lockscreen.notifications.LockNotification
 import com.pixelexperience.forall.lockscreen.media.rememberLockMedia
 import com.pixelexperience.forall.lockscreen.ui.components.MediaPlayerCard
+import com.pixelexperience.forall.lockscreen.ui.components.FingerprintHint
 import com.pixelexperience.forall.lockscreen.ui.clock.LockClock
 import com.pixelexperience.forall.lockscreen.widget.HostedClockWidget
 import com.pixelexperience.forall.lockscreen.ui.components.Backdrop
@@ -507,6 +508,8 @@ fun LockScreenContent(
                 }
             }
         }
+        // indicador visual do leitor lateral: some ao desbloquear (unlocking/unlockSignal) e não aparece no preview
+        if (!preview) FingerprintHint(visible = !unlocking, color = scheme.secondaryContainer)
     }
 }
 
