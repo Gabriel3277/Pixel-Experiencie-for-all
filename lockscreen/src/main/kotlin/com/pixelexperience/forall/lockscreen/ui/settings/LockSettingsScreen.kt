@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PowerSettingsNew
@@ -192,6 +193,7 @@ fun LockSettingsScreen(onBack: () -> Unit) {
                             Cat(Icons.Filled.Notifications, P_ORANGE, "Notificações", "Cards, agrupamento e privacidade", "Notificações"),
                             Cat(Icons.Filled.Apps, P_PINK, "Atalhos inferiores", s.leftShortcut.label + " · " + s.rightShortcut.label, "Atalhos inferiores"),
                             Cat(Icons.Filled.Bedtime, P_BLUE, "Always-On", if (s.aodEnabled) "Ativado" else "Desativado", "Always-On"),
+                            Cat(Icons.Filled.Fingerprint, P_GREEN, "Leitor de digital", if (s.fingerprintAssist) "Ativado" else "Desativado", "Leitor de digital"),
                         ),
                     ) { page = it }
                 }
@@ -295,6 +297,15 @@ fun LockSettingsScreen(onBack: () -> Unit) {
                     SwitchRow("Mostrar conteúdo com bloqueio seguro", s.showContentWhenSecure) { v -> set { it.copy(showContentWhenSecure = v) } }
                     Text(
                         "Desligado: com PIN/senha/digital configurados, o texto das notificações fica oculto até desbloquear.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                }
+                "Leitor de digital" -> {
+                Section("Leitor de digital") {
+                    SwitchRow("Reagir ao leitor lateral", s.fingerprintAssist) { v -> set { it.copy(fingerprintAssist = v) } }
+                    Text(
+                        "Ao tocar no leitor com a tela de bloqueio aberta, o app recebe o resultado do Android, anima e pede o desbloqueio. Quem confere a digital é o sistema; o app não guarda nem reconhece digitais. Em alguns aparelhos o Android ainda pede PIN ou um novo toque na tela de confirmação.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }

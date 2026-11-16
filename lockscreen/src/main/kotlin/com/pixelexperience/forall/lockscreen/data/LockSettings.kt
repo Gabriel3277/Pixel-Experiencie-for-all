@@ -57,6 +57,7 @@ data class LockSettings(
     val aodEnabled: Boolean = true,
     val wallpaperFit: WallpaperFit = WallpaperFit.FILL,
     val showBatteryPercent: Boolean = true,
+    val fingerprintAssist: Boolean = true,
 )
 
 private val Context.lockStore by preferencesDataStore("pxe_lockscreen")
@@ -85,6 +86,7 @@ private object K {
     val aod = booleanPreferencesKey("aod_enabled")
     val wpFit = stringPreferencesKey("wallpaper_fit")
     val batPct = booleanPreferencesKey("show_battery_pct")
+    val fpAssist = booleanPreferencesKey("fp_assist")
 }
 
 private inline fun <reified E : Enum<E>> Preferences.enumOf(key: Preferences.Key<String>, def: E): E {
@@ -118,6 +120,7 @@ private fun Preferences.toSettings(): LockSettings {
         aodEnabled = this[K.aod] ?: d.aodEnabled,
         wallpaperFit = enumOf(K.wpFit, d.wallpaperFit),
         showBatteryPercent = this[K.batPct] ?: d.showBatteryPercent,
+        fingerprintAssist = this[K.fpAssist] ?: d.fingerprintAssist,
     )
 }
 
@@ -145,6 +148,7 @@ private fun MutablePreferences.write(s: LockSettings) {
     this[K.aod] = s.aodEnabled
     this[K.wpFit] = s.wallpaperFit.name
     this[K.batPct] = s.showBatteryPercent
+    this[K.fpAssist] = s.fingerprintAssist
 }
 
 /** Fonte única das configurações: estado em memória (instantâneo) + persistência em DataStore (com debounce). */

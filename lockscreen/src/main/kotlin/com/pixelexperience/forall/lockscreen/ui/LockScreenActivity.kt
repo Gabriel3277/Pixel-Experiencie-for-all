@@ -34,6 +34,9 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
+import android.hardware.fingerprint.FingerprintManager
+import android.os.CancellationSignal
+import android.view.HapticFeedbackConstants
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.WindowManager
@@ -139,6 +142,8 @@ class LockScreenActivity : ComponentActivity() {
                     onGrantNotificationAccess = { launchAfterUnlock(LockScreenModule.notificationAccessIntent(this@LockScreenActivity)) },
                     onManageNotifications = { launchAfterUnlock(android.content.Intent("android.settings.ALL_APPS_NOTIFICATION_SETTINGS")) },
                     unlockSignal = unlockSignal.value,
+                    fpReadTick = fpRead.value,
+                    fpErrorTick = fpError.value,
                     onUnlockAnimated = { if (!isFinishing) finishAndRemoveTask() },
                     onShortcut = { runShortcut(it) },
                     onOpenNotification = { n ->
@@ -189,6 +194,55 @@ class LockScreenActivity : ComponentActivity() {
         super.onResume()
         notifAccess.value = LockScreenModule.hasNotificationAccess(this)
         LockScreenModule.ensureNotificationListener(this)
+        startFingerprint()
+    }
+
+    // ---- leitor de digital (API oficial FingerprintManager; o reconhecimento é do sistema) ----
+    private val fpRead = mutableStateOf(0)
+    private val fpError = mutableStateOf(0)
+    private var fpCancel: CancellationSignal? = null
+
+    @Suppress("DEPRECATION")
+    private fun startFingerprint() {
+        if (fpCancel != null || isFinishing) return
+        if (!LockSettingsRepository.get(this).settings.value.fingerprintAssist) return
+        val fm = runCatching { getSystemService(FingerprintManager::class.java) }.getOrNull() ?: return
+        val usable = runCatching { fm.isHardwareDetected && fm.hasEnrolledFingerprints() }.getOrDefault(false)
+        if (!usable) return
+        val cancel = CancellationSignal()
+        fpCancel = cancel
+        runCatching {
+            fm.authenticate(null, cancel, 0, object : FingerprintManager.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: FingerprintManager.AuthenticationResult?) {
+                    fpCancel = null
+                    if (aod.value) applyAod(false)
+                    // quem libera o aparelho é o keyguard do sistema: pedimos a liberação e animamos quando ele confirmar
+                    unlock(onSuccess = { unlockSignal.value = true }, onFail = { fpError.value++ })
+                }
+
+                override fun onAuthenticationFailed() {
+                    fpError.value++
+                    window.decorView.performHapticFeedback(
+                        if (android.os.Build.VERSION.SDK_INT >= 30) HapticFeedbackConstants.REJECT else HapticFeedbackConstants.CONTEXT_CLICK
+                    )
+                }
+
+                override fun onAuthenticationHelp(helpMsgId: Int, helpString: CharSequence?) { fpRead.value++ }
+
+                // bloqueio por tentativas, cancelamento por outro cliente etc.: para de ouvir, sem laço de reinício
+                override fun onAuthenticationError(errMsgId: Int, errString: CharSequence?) { fpCancel = null }
+            }, handler)
+        }.onFailure { fpCancel = null }
+    }
+
+    private fun stopFingerprint() {
+        fpCancel?.cancel()
+        fpCancel = null
+    }
+
+    override fun onPause() {
+        stopFingerprint()
+        super.onPause()
     }
 
     private var unlockPending = false
@@ -196,6 +250,7 @@ class LockScreenActivity : ComponentActivity() {
     private fun unlock(onSuccess: () -> Unit = {}, onFail: () -> Unit = {}) {
         if (unlockPending) { onFail(); return }
         unlockPending = true
+        stopFingerprint() // o keyguard precisa do sensor para a própria confirmação
         val km = getSystemService(KeyguardManager::class.java)
         val started = runCatching {
             km.requestDismissKeyguard(this, object : KeyguardManager.KeyguardDismissCallback() {
@@ -204,11 +259,11 @@ class LockScreenActivity : ComponentActivity() {
                     onSuccess()
                     finishAndRemoveTask()
                 }
-                override fun onDismissCancelled() { unlockPending = false; onFail() }
-                override fun onDismissError() { unlockPending = false; onFail() }
+                override fun onDismissCancelled() { unlockPending = false; startFingerprint(); onFail() }
+                override fun onDismissError() { unlockPending = false; startFingerprint(); onFail() }
             })
         }.isSuccess
-        if (!started) { unlockPending = false; onFail() }
+        if (!started) { unlockPending = false; startFingerprint(); onFail() }
     }
 
     /** Android 14+: o remetente precisa permitir explicitamente iniciar a activity do PendingIntent. */

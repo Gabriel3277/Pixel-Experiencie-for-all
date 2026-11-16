@@ -183,6 +183,8 @@ fun LockScreenContent(
     onGrantNotificationAccess: () -> Unit = {},
     onManageNotifications: () -> Unit = {},
     unlockSignal: Boolean = false,
+    fpReadTick: Int = 0,
+    fpErrorTick: Int = 0,
     onUnlockAnimated: () -> Unit = {},
     preview: Boolean = false,
     previewScale: Float = 1f,
@@ -521,7 +523,7 @@ fun LockScreenContent(
             }
         }
         // indicador visual do leitor lateral: some ao desbloquear (unlocking/unlockSignal) e não aparece no preview
-        if (!preview) FingerprintHint(visible = !unlocking, color = scheme.secondaryContainer)
+        if (!preview) FingerprintHint(visible = !unlocking, color = scheme.secondaryContainer, readTick = fpReadTick, errorTick = fpErrorTick)
     }
 }
 
