@@ -107,7 +107,7 @@ class LockScreenActivity : ComponentActivity() {
         )
         // barra de navegação realmente transparente (sem scrim automático) e ícones claros da status bar, como no Pixel
         window.isNavigationBarContrastEnforced = false
-        overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
+        overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, android.R.anim.fade_out)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() { /* a tela de bloqueio ignora "voltar" */ }
         })
@@ -152,7 +152,7 @@ class LockScreenActivity : ComponentActivity() {
                     onAction = { act -> unlock(onSuccess = { act.intent?.let { sendPending(it) } }) },
                     onDismissNotification = { LockNotificationListener.cancel(it) },
                     onClearAll = { LockNotificationListener.cancelAll() },
-                    onRequestUnlock = { cb -> unlock(onFail = { cb(false) }) },
+                    onRequestUnlock = { cb -> unlock(onSuccess = { cb(true) }, onFail = { cb(false) }) },
                 )
                 }
             }

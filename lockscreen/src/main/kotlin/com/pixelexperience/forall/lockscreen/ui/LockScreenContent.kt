@@ -6,6 +6,8 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -156,13 +158,14 @@ fun rememberWallpaper(id: String, version: Int): WallpaperUi? {
     return state.value
 }
 
-private fun Modifier.layerFx(enter: () -> Float, drag: () -> Float, parallax: Float, fade: Float, unlockDist: () -> Float): Modifier =
+private fun Modifier.layerFx(enter: () -> Float, drag: () -> Float, parallax: Float, fade: Float, unlockDist: () -> Float, shakeX: () -> Float = { 0f }): Modifier =
     graphicsLayer {
         val e = enter()
         val d = drag()
         val p = (-d / unlockDist()).coerceIn(0f, 1f)
         alpha = (e * (1f - p * fade)).coerceIn(0f, 1f)
         translationY = (1f - e) * 36.dp.toPx() + d * parallax
+        translationX = shakeX().dp.toPx()
         val s = (0.94f + 0.06f * e) * (1f - 0.04f * p)
         scaleX = s
         scaleY = s
@@ -223,6 +226,14 @@ fun LockScreenContent(
     val requestUnlock by rememberUpdatedState(onRequestUnlock)
     // evita pedir o desbloqueio duas vezes (onDragStopped + onPostFling disparam juntos)
     var unlocking by remember { mutableStateOf(false) }
+    // feedback do PIN nativo: escurece suavemente enquanto o sistema pede o PIN e treme de leve ao cancelar/erro
+    var pinOpen by remember { mutableStateOf(false) }
+    val shake = remember { Animatable(0f) }
+    val pinScrim = animateFloatAsState(
+        if (pinOpen) 0.32f else 0f,
+        spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow),
+        label = "pinScrim",
+    )
     val weather by WeatherRepository.state.collectAsStateWithLifecycle()
     LaunchedEffect(settings.showWeather) { if (settings.showWeather) WeatherRepository.refresh(ctx) }
     // desbloqueio por biometria nativa: o conteúdo sobe e some com a mesma mola do gesto
@@ -241,14 +252,32 @@ fun LockScreenContent(
         )
     }
 
+    fun rejectFeedback() {
+        view.performHapticFeedback(
+            if (android.os.Build.VERSION.SDK_INT >= 30) android.view.HapticFeedbackConstants.REJECT
+            else android.view.HapticFeedbackConstants.CONTEXT_CLICK
+        )
+        scope.launch {
+            val snap = spring<Float>(stiffness = Spring.StiffnessHigh)
+            shake.snapTo(0f)
+            shake.animateTo(-14f, snap)
+            shake.animateTo(10f, snap)
+            shake.animateTo(-5f, snap)
+            shake.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium))
+        }
+    }
+
     suspend fun settle(vy: Float) {
         if (preview || unlocking) return
         if (drag.value < -unlockDist * 0.45f || (drag.value < 0f && vy < -1800f)) {
             unlocking = true
             drag.animateTo(-unlockDist * 1.2f, LockMotion.spatial())
+            pinOpen = true
             requestUnlock { ok ->
                 if (!ok) {
+                    pinOpen = false
                     unlocking = false
+                    rejectFeedback()
                     scope.launch { drag.animateTo(0f, LockMotion.bouncy()) }
                 } else confirmHaptic()
             }
@@ -324,6 +353,7 @@ fun LockScreenContent(
     val e3 = animateFloatAsState(if (stage >= 3) 1f else 0f, LockMotion.spatial(), label = "e3")
     val dragFn = { drag.value }
     val distFn = { unlockDist }
+    val shakeFn = { shake.value }
 
     Box(
         modifier
@@ -433,13 +463,13 @@ fun LockScreenContent(
                     GlanceInfo(
                         gw, clockTint,
                         Modifier.padding(start = 28.dp, end = 28.dp, top = 8.dp).onSizeChanged { glanceH = it.height }
-                            .layerFx(e1::value, dragFn, 0.25f, 1.4f, distFn),
+                            .layerFx(e1::value, dragFn, 0.25f, 1.4f, distFn, shakeFn),
                     )
                 }
                 val glanceDp = if (gw != null) with(density) { glanceH.toDp() } else 0.dp
                 Spacer(Modifier.height((animatedTop - glanceDp).coerceAtLeast(if (gw != null) 16.dp else 0.dp)))
                 HostedClockWidget(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp).layerFx(e1::value, dragFn, 0.35f, 1.4f, distFn),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp).layerFx(e1::value, dragFn, 0.35f, 1.4f, distFn, shakeFn),
                     below = {
                         LockClock(
                             style = settings.clockStyle, scale = settings.clockScale, align = settings.clockAlign, tint = clockTint, tint2 = clockTint2,
@@ -451,13 +481,13 @@ fun LockScreenContent(
                         LockClock(
                             style = settings.clockStyle, scale = settings.clockScale, align = settings.clockAlign, tint = clockTint, tint2 = clockTint2,
                             weather = if (settings.showWeather) weather else null,
-                            modifier = Modifier.padding(horizontal = 28.dp).layerFx(e1::value, dragFn, 0.35f, 1.4f, distFn),
+                            modifier = Modifier.padding(horizontal = 28.dp).layerFx(e1::value, dragFn, 0.35f, 1.4f, distFn, shakeFn),
                         )
                     },
                 )
                 NextAlarmChip(
                     tint = clockTint, align = settings.clockAlign,
-                    modifier = Modifier.layerFx(e1::value, dragFn, 0.35f, 1.4f, distFn),
+                    modifier = Modifier.layerFx(e1::value, dragFn, 0.35f, 1.4f, distFn, shakeFn),
                 )
                 Spacer(Modifier.height(16.dp))
                 MediaPlayerCard(
@@ -468,9 +498,9 @@ fun LockScreenContent(
                     onAccent = scheme.onPrimary,
                     glass = settings.glassNotifications,
                     glassOpacity = settings.cardOpacity,
-                    modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 8.dp).layerFx(e2::value, dragFn, 0.6f, 1.2f, distFn),
+                    modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 8.dp).layerFx(e2::value, dragFn, 0.6f, 1.2f, distFn, shakeFn),
                 )
-                Box(Modifier.weight(1f).padding(horizontal = 12.dp).layerFx(e2::value, dragFn, 0.6f, 1.2f, distFn)) {
+                Box(Modifier.weight(1f).padding(horizontal = 12.dp).layerFx(e2::value, dragFn, 0.6f, 1.2f, distFn, shakeFn)) {
                     NotificationsList(
                         items = shown,
                         scheme = scheme,
@@ -510,7 +540,7 @@ fun LockScreenContent(
                 }
                 Row(
                     Modifier.fillMaxWidth().padding(start = 48.dp, end = 48.dp, top = 20.dp, bottom = 32.dp)
-                        .layerFx(e3::value, dragFn, 1f, 1.6f, distFn),
+                        .layerFx(e3::value, dragFn, 1f, 1.6f, distFn, shakeFn),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -522,6 +552,8 @@ fun LockScreenContent(
                 }
             }
         }
+        // escurecimento suave enquanto o PIN do sistema está aberto (não consome toques)
+        if (!preview) Box(Modifier.fillMaxSize().graphicsLayer { alpha = pinScrim.value }.background(Color.Black))
         // indicador visual do leitor lateral: some ao desbloquear (unlocking/unlockSignal) e não aparece no preview
         if (!preview) FingerprintHint(visible = !unlocking, color = scheme.secondaryContainer, readTick = fpReadTick, errorTick = fpErrorTick)
     }
