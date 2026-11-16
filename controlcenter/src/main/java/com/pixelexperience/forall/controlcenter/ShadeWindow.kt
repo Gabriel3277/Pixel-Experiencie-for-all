@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.pixelexperience.forall.controlcenter.ui.PanelTypography
 import com.pixelexperience.forall.controlcenter.ui.UnifiedPanel
 import com.pixelexperience.forall.controlcenter.ui.NotificationsPanel
 import com.pixelexperience.forall.controlcenter.ui.PANEL_CONTENT_DP
@@ -363,6 +364,7 @@ internal class ShadeWindow(
             setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
             setContent {
                 PixelTheme(dynamicColor = true) {
+                  PanelTypography {
                     val topInset = with(LocalDensity.current) { statusBarPx.toDp() }
                     if (kind == ShadeKind.NOTIFICATIONS) {
                         UnifiedPanel(state = panelState, topInset = topInset, actions = this@ShadeWindow)
@@ -373,6 +375,7 @@ internal class ShadeWindow(
                             actions = this@ShadeWindow,
                         )
                     }
+                  }
                 }
             }
         }

@@ -41,7 +41,10 @@ import kotlinx.coroutines.delay
 /** Mantido por compatibilidade: o cartão agora tem altura própria (varia com os blocos). */
 internal const val PANEL_CONTENT_DP = 388
 
-/** Cores do painel: tons de verde (da cor dinâmica do sistema), como no Android 17. */
+/**
+ * Cores do painel: só papéis do tema Material You (cores dinâmicas do papel de parede).
+ * Sem cores fixas: o rosado/alaranjado vem do primary e dos containers do sistema.
+ */
 internal class PanelColors(
     val panel: Color,
     val tileOff: Color,
@@ -58,8 +61,8 @@ internal fun rememberPanelColors(): PanelColors {
     return remember(cs, dark) {
         if (dark) {
             PanelColors(
-                panel = lerp(Color(0xFF0F1511), cs.primary, 0.18f),
-                tileOff = lerp(Color(0xFF0A0F0B), cs.primary, 0.08f),
+                panel = lerp(cs.surfaceContainer, cs.primaryContainer, 0.25f),
+                tileOff = lerp(cs.surfaceContainerHighest, cs.primaryContainer, 0.25f),
                 tileOn = cs.primary,
                 onTileOn = cs.onPrimary,
                 onTileOff = cs.onSurface,
@@ -67,8 +70,8 @@ internal fun rememberPanelColors(): PanelColors {
             )
         } else {
             PanelColors(
-                panel = lerp(Color.White, cs.primary, 0.14f),
-                tileOff = lerp(Color.White, cs.primary, 0.26f),
+                panel = lerp(cs.surfaceContainerLow, cs.primaryContainer, 0.30f),
+                tileOff = lerp(cs.surfaceContainerHighest, cs.primaryContainer, 0.45f),
                 tileOn = cs.primary,
                 onTileOn = cs.onPrimary,
                 onTileOff = cs.onSurface,
