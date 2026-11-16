@@ -8,6 +8,12 @@ import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import android.content.Intent
+import android.util.Log
+import java.io.File
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -62,6 +68,16 @@ fun HomeScreen(
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val context = LocalContext.current
+    val crashFile = remember { File(context.filesDir, "crash.txt") }
+    var crash by remember { mutableStateOf(if (crashFile.exists()) crashFile.readText().take(1800) else null) }
+    remember {
+        val old = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            runCatching { crashFile.writeText(Log.getStackTraceString(e)) }
+            old?.uncaughtException(t, e)
+        }
+        true
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -91,6 +107,20 @@ fun HomeScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            crash?.let { text ->
+                item {
+                    Card(
+                        onClick = { crashFile.delete(); crash = null },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(text = "Erro (toque para limpar)", style = MaterialTheme.typography.titleSmall)
+                            Text(text = text, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
             item { CoreStatusCard(state) }
             item {
                 Card(
