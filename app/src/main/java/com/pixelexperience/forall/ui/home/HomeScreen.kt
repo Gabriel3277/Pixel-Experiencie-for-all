@@ -7,6 +7,7 @@ import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import android.content.Intent
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.pixelexperience.forall.MainUiState
@@ -59,6 +61,7 @@ fun HomeScreen(
     onToggleModule: (PixelModuleId, Boolean) -> Unit,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val context = LocalContext.current
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -89,6 +92,30 @@ fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item { CoreStatusCard(state) }
+            item {
+                Card(
+                    onClick = {
+                        context.startActivity(
+                            Intent().setClassName(
+                                context.packageName,
+                                "com.pixelexperience.forall.statusbar.StatusBarSettingsActivity",
+                            ),
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(text = "Barra de status", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = "Ativar e configurar a barra estilo Android 17",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
             item {
                 Text(
                     text = stringResource(R.string.home_modules_title),
