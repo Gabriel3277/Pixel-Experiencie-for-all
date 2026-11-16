@@ -1,5 +1,6 @@
 package com.pixelexperience.forall.statusbar
 
+import android.content.Context
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.media.AudioManager
@@ -44,6 +45,7 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +55,15 @@ import androidx.compose.ui.unit.sp
 private val DarkInk = Color(0xFF1B1B1F)
 private const val MAX_NOTIF_ICONS = 3
 
+/** Quicksand (assets/quicksand.ttf, peso 600); se o arquivo faltar, usa a fonte do sistema. */
+private fun loadClockFont(context: Context): FontFamily =
+    runCatching {
+        val typeface = Typeface.Builder(context.assets, "quicksand.ttf")
+            .setFontVariationSettings("'wght' 600")
+            .build()
+        if (typeface != null) FontFamily(typeface) else FontFamily.SansSerif
+    }.getOrDefault(FontFamily.SansSerif)
+
 @Composable
 internal fun StatusBarContent(s: StatusBarState) {
     val fg by animateColorAsState(
@@ -60,6 +71,8 @@ internal fun StatusBarContent(s: StatusBarState) {
         animationSpec = tween(250),
         label = "fg"
     )
+    val context = LocalContext.current
+    val clockFont = remember { loadClockFont(context) }
     val shadow = if (s.darkIcons) null else Shadow(Color(0x66000000), Offset(0f, 1f), 3f)
 
     val notifs = when (s.notifMode) {
@@ -79,9 +92,9 @@ internal fun StatusBarContent(s: StatusBarState) {
             text = s.time,
             color = fg,
             style = TextStyle(
-                fontFamily = FontFamily.SansSerif,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
+                fontFamily = clockFont,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Normal,
                 letterSpacing = 0.sp,
                 fontFeatureSettings = "tnum",
                 shadow = shadow
@@ -159,44 +172,42 @@ private fun SignalIcon(level: Int, color: Color) {
     }
 }
 
-/** Leque preenchido (estilo Pixel): o sinal revela o leque de dentro para fora. */
+/** Wi-Fi estilo Pixel: leque de 4 faixas separadas por vãos finos; o sinal acende de dentro para fora. */
 @Composable
 private fun WifiIcon(level: Int, color: Color) {
-    val frac by animateFloatAsState(
-        targetValue = when (level) {
-            0 -> 0.3f
-            1 -> 0.5f
-            2 -> 0.7f
-            3 -> 0.88f
-            else -> 1f
-        },
-        animationSpec = tween(250),
-        label = "wifi"
-    )
-    Canvas(Modifier.size(width = 17.dp, height = 13.dp)) {
+    val active = level.coerceIn(1, 4)
+    val alphas = List(4) { i ->
+        animateFloatAsState(if (i < active) 1f else 0.3f, tween(250), label = "wifi$i").value
+    }
+    Canvas(Modifier.size(width = 18.dp, height = 14.dp)) {
+        val half = 50f
         val cx = size.width / 2
-        val cy = size.height
-        val radius = size.width / 1.4142f
-        val sector = Path().apply {
+        val cy = size.height - 1.dp.toPx()
+        val outer = minOf(size.width / 1.6f, cy - 0.7.dp.toPx())
+        val gap = 1.3.dp.toPx()
+        val fracs = floatArrayOf(0.30f, 0.55f, 0.78f, 1f)
+        val round = Stroke(width = 1.dp.toPx(), join = StrokeJoin.Round, cap = StrokeCap.Round)
+        for (i in 0 until 4) {
+            val rOut = outer * fracs[i]
+            val rIn = if (i == 0) 0f else outer * fracs[i - 1] + gap
+            val band = bandPath(cx, cy, rIn, rOut, -90f - half, half * 2)
+            drawPath(band, color.copy(alpha = alphas[i]))
+            drawPath(band, color.copy(alpha = alphas[i]), style = round)
+        }
+    }
+}
+
+private fun bandPath(cx: Float, cy: Float, rIn: Float, rOut: Float, start: Float, sweep: Float): Path {
+    fun box(r: Float) = Rect(Offset(cx - r, cy - r), Size(r * 2, r * 2))
+    return Path().apply {
+        if (rIn <= 0f) {
             moveTo(cx, cy)
-            arcTo(
-                rect = Rect(Offset(cx - radius, cy - radius), Size(radius * 2, radius * 2)),
-                startAngleDegrees = -135f,
-                sweepAngleDegrees = 90f,
-                forceMoveTo = false
-            )
-            close()
+            arcTo(box(rOut), start, sweep, false)
+        } else {
+            arcTo(box(rOut), start, sweep, true)
+            arcTo(box(rIn), start + sweep, -sweep, false)
         }
-        val soften = Stroke(width = 1.2.dp.toPx(), join = StrokeJoin.Round, cap = StrokeCap.Round)
-        drawPath(sector, color.copy(alpha = 0.3f))
-        drawPath(sector, color.copy(alpha = 0.3f), style = soften)
-        val reveal = Path().apply {
-            addOval(Rect(Offset(cx - radius * frac, cy - radius * frac), Size(radius * 2 * frac, radius * 2 * frac)))
-        }
-        clipPath(reveal) {
-            drawPath(sector, color)
-            drawPath(sector, color, style = soften)
-        }
+        close()
     }
 }
 
@@ -261,7 +272,7 @@ private fun KeyIcon(color: Color) {
     }
 }
 
-/** Pílula de bateria do Android 17: número dentro; raio ao carregar; cor por estado. */
+/** Bateria estilo Pixel: corpo arredondado com terminal, número dentro, raio ao carregar. */
 @Composable
 private fun BatteryPill(s: StatusBarState) {
     val dark = s.darkIcons
@@ -287,19 +298,29 @@ private fun BatteryPill(s: StatusBarState) {
     val showText = s.showBatteryPct
     val charging = s.charging
 
-    Canvas(Modifier.size(width = 30.dp, height = 15.dp)) {
-        val w = size.width
+    Canvas(Modifier.size(width = 32.dp, height = 15.dp)) {
         val h = size.height
-        val pill = Path().apply { addRoundRect(RoundRect(0f, 0f, w, h, CornerRadius(h / 2))) }
-        drawPath(pill, base.copy(alpha = 0.35f))
-        val fw = w * pct
-        clipPath(pill) { drawRect(fill, size = Size(fw, h)) }
+        val nubW = 2.2.dp.toPx()
+        val nubH = 6.dp.toPx()
+        val bodyW = size.width - nubW - 0.8.dp.toPx()
+        val track = base.copy(alpha = 0.32f)
 
+        val body = Path().apply { addRoundRect(RoundRect(0f, 0f, bodyW, h, CornerRadius(h * 0.36f))) }
+        drawPath(body, track)
+        drawRoundRect(
+            color = if (pct > 0.97f) fill else track,
+            topLeft = Offset(size.width - nubW, (h - nubH) / 2),
+            size = Size(nubW, nubH),
+            cornerRadius = CornerRadius(nubW / 2)
+        )
+
+        val fw = bodyW * pct
+        clipPath(body) { drawRect(fill, size = Size(fw, h)) }
         clipRect(0f, 0f, fw, h) {
-            drawBatteryGlyphs(paint, label, showText, charging, textOnFill)
+            drawBatteryGlyphs(paint, label, showText, charging, textOnFill, bodyW)
         }
-        clipRect(fw, 0f, w, h) {
-            drawBatteryGlyphs(paint, label, showText, charging, base)
+        clipRect(fw, 0f, bodyW, h) {
+            drawBatteryGlyphs(paint, label, showText, charging, base, bodyW)
         }
     }
 }
@@ -309,16 +330,16 @@ private fun DrawScope.drawBatteryGlyphs(
     label: String,
     showText: Boolean,
     charging: Boolean,
-    color: Color
+    color: Color,
+    w: Float
 ) {
-    val w = size.width
     val h = size.height
-    val textCenter = if (charging && showText) w * 0.6f else w / 2
+    val textCenter = if (charging && showText) w * 0.62f else w / 2
 
     if (charging) {
         val bw = h * 0.42f
         val bh = h * 0.68f
-        val ox = if (showText) w * 0.17f else (w - bw) / 2
+        val ox = if (showText) w * 0.1f else (w - bw) / 2
         val oy = (h - bh) / 2
         val bolt = Path().apply {
             moveTo(ox + bw * 0.62f, oy)
@@ -333,7 +354,7 @@ private fun DrawScope.drawBatteryGlyphs(
     }
 
     if (showText) {
-        paint.textSize = 10.sp.toPx()
+        paint.textSize = 11.sp.toPx()
         paint.color = color.toArgb()
         val y = h / 2 - (paint.ascent() + paint.descent()) / 2
         drawIntoCanvas { it.nativeCanvas.drawText(label, textCenter, y, paint) }
