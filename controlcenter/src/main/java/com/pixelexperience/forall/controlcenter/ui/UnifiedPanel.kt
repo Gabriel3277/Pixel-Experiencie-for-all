@@ -15,7 +15,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -55,6 +58,15 @@ import com.pixelexperience.forall.controlcenter.R
 import kotlinx.coroutines.delay
 
 private val FooterHeight = 72.dp
+
+/** footer: 0 nenhum, 1 pilha fechada (Mostrar tudo), 2 último item do grupo aberto. */
+private class NotifEntry(
+    val key: String,
+    val item: NotifItem,
+    val group: List<NotifItem>,
+    val pkg: String,
+    val footer: Int,
+)
 
 /**
  * Painel único (Android 17): central de controle em cima e as notificações
@@ -164,47 +176,82 @@ internal fun UnifiedPanel(
                         fontSize = 15.sp,
                         modifier = Modifier.align(Alignment.Center),
                     )
-                    else -> LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                            .drawWithContent {
-                                drawContent()
-                                val top = size.height - FooterHeight.toPx() - 40.dp.toPx()
-                                val end = size.height - FooterHeight.toPx() + 8.dp.toPx()
-                                drawRect(
-                                    brush = Brush.verticalGradient(
-                                        colors = listOf(Color.Black, Color.Transparent),
-                                        startY = top,
-                                        endY = end,
-                                    ),
-                                    topLeft = Offset(0f, top),
-                                    size = Size(size.width, size.height - top),
-                                    blendMode = BlendMode.DstIn,
-                                )
-                            },
-                        contentPadding = PaddingValues(bottom = FooterHeight),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        itemsIndexed(groups, key = { _, g -> g.key }) { index, g ->
-                            val enter = if (index < 4) Modifier.entrance(6 + index) else Modifier
+                    else -> {
+                        val entries = groups.flatMap { g ->
                             val list = g.value
-                            NotifGroup(
-                                modifier = enter,
-                                list = list,
-                                expanded = expanded[g.key] == true,
-                                onToggle = { expanded[g.key] = expanded[g.key] != true },
-                                c = c,
-                                onOpen = { item ->
-                                    NotificationStore.open(context, item)
-                                    actions.collapse()
-                                },
-                                onDismissItem = { item -> NotificationStore.dismiss(item.key) },
-                                onDismissGroup = {
-                                    list.filter { it.clearable }
+                            val open = expanded[g.key] == true
+                            when {
+                                list.size == 1 -> listOf(NotifEntry("s" + list[0].key, list[0], list, g.key, 0))
+                                !open -> listOf(NotifEntry("h" + g.key, list[0], list, g.key, 1))
+                                else -> list.mapIndexed { i, it ->
+                                    NotifEntry("e" + it.key, it, list, g.key, if (i == list.lastIndex) 2 else 0)
+                                }
+                            }
+                        }
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                                .drawWithContent {
+                                    drawContent()
+                                    val top = size.height - FooterHeight.toPx() - 40.dp.toPx()
+                                    val end = size.height - FooterHeight.toPx() + 8.dp.toPx()
+                                    drawRect(
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(Color.Black, Color.Transparent),
+                                            startY = top,
+                                            endY = end,
+                                        ),
+                                        topLeft = Offset(0f, top),
+                                        size = Size(size.width, size.height - top),
+                                        blendMode = BlendMode.DstIn,
+                                    )
+                                }
+                                .verticalScroll(rememberScrollState()),
+                        ) {
+                            SegmentedSwipeList(
+                                items = entries,
+                                itemKey = { it.key },
+                                onDismiss = { e ->
+                                    if (e.footer == 1) e.group.filter { it.clearable }
                                         .forEach { NotificationStore.dismiss(it.key) }
+                                    else NotificationStore.dismiss(e.item.key)
                                 },
-                            )
+                                canDismiss = { e ->
+                                    if (e.footer == 1) e.group.any { it.clearable } else e.item.clearable
+                                },
+                                containerColor = c.tileOff,
+                                contentColor = c.onTileOff,
+                                outerRadius = 24.dp,
+                                innerRadius = 6.dp,
+                            ) { e ->
+                                Column {
+                                    NotifBody(e.item, c, {
+                                        NotificationStore.open(context, e.item)
+                                        actions.collapse()
+                                    })
+                                    if (e.footer == 1) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                                            horizontalArrangement = Arrangement.Center,
+                                        ) {
+                                            GroupPill("Mostrar tudo (${e.group.size})", c) { expanded[e.pkg] = true }
+                                        }
+                                    } else if (e.footer == 2) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                                        ) {
+                                            GroupPill("Mostrar menos", c) { expanded[e.pkg] = false }
+                                            GroupPill("Limpar grupo", c) {
+                                                e.group.filter { it.clearable }
+                                                    .forEach { NotificationStore.dismiss(it.key) }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(FooterHeight))
                         }
                     }
                 }
@@ -336,7 +383,7 @@ private fun GroupPill(text: String, c: PanelColors, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(18.dp))
-            .background(c.tileOff)
+            .background(c.onTileOff.copy(alpha = 0.10f))
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
