@@ -47,7 +47,8 @@ fun FingerprintHint(visible: Boolean, color: Color, modifier: Modifier = Modifie
     val owner = LocalLifecycleOwner.current
     val state by owner.lifecycle.currentStateFlow.collectAsState()
     val resumed = state.isAtLeast(Lifecycle.State.RESUMED)
-    val shape = remember { MaterialShapes.Arrow.toShape() }
+    // toShape() é @Composable (já faz remember por dentro), então não pode ficar dentro de remember { }
+    val shape = MaterialShapes.Arrow.toShape()
 
     BoxWithConstraints(modifier.fillMaxSize()) {
         AnimatedVisibility(
