@@ -95,6 +95,7 @@ fun LockClock(
     tint2: Color = tint,
     weather: WeatherUi? = null,
     showClock: Boolean = true,
+    showDate: Boolean = true,
 ) {
     val ctx = LocalContext.current
     var now by remember { mutableStateOf(Date()) }
@@ -150,7 +151,7 @@ fun LockClock(
             contentAlignment = if (align == ClockAlign.START) Alignment.TopStart else Alignment.TopCenter,
             label = "clockStyle",
         ) { st -> ClockFace(st, hh, mm, scale, horizontal, tint, tint2) }
-        Row(Modifier.padding(start = if (align == ClockAlign.START) 6.dp else 0.dp, top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (showDate) Row(Modifier.padding(start = if (align == ClockAlign.START) 6.dp else 0.dp, top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(text = date, style = dateStyle)
             if (weather != null) {
                 Spacer(Modifier.width(10.dp))

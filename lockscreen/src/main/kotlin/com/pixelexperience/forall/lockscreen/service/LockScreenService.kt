@@ -22,6 +22,7 @@ import com.pixelexperience.forall.lockscreen.LockScreenModule
 import com.pixelexperience.forall.lockscreen.data.LockSettingsRepository
 import com.pixelexperience.forall.lockscreen.data.WallpaperRepository
 import com.pixelexperience.forall.lockscreen.ui.LockScreenActivity
+import com.pixelexperience.forall.lockscreen.ui.aod.AodState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -36,7 +37,11 @@ class LockScreenService : Service() {
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (intent.action == Intent.ACTION_SCREEN_OFF) showLock()
+            if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                // o SCREEN_OFF que encerra um AOD não abre outro (senão a tela nunca apagaria)
+                val aod = LockSettingsRepository.get(context).settings.value.aodEnabled && !AodState.screenIsAod
+                showLock(aod)
+            }
         }
     }
 
@@ -97,15 +102,16 @@ class LockScreenService : Service() {
         }
     }
 
-    private fun showLock() {
+    private fun showLock(aod: Boolean = false) {
         if (!Settings.canDrawOverlays(this)) return
         if (!LockSettingsRepository.get(this).settings.value.enabled) return
+        AodState.screenIsAod = aod
         runCatching {
             startActivity(
                 Intent(this, LockScreenActivity::class.java).addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or
                         Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NO_ANIMATION
-                )
+                ).putExtra(LockScreenActivity.EXTRA_AOD, aod)
             )
         }
     }

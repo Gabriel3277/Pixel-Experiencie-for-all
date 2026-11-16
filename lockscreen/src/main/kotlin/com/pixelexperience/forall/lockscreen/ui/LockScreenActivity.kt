@@ -28,6 +28,14 @@ import com.pixelexperience.forall.lockscreen.notifications.LockNotificationRepos
 import com.pixelexperience.forall.lockscreen.system.TorchController
 import androidx.compose.foundation.isSystemInDarkTheme
 import com.pixelexperience.forall.lockscreen.ui.theme.LockTheme
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
+import android.os.Handler
+import android.os.Looper
+import android.view.WindowManager
+import com.pixelexperience.forall.lockscreen.data.LockPalette
+import com.pixelexperience.forall.lockscreen.ui.aod.AodContent
+import com.pixelexperience.forall.lockscreen.ui.aod.AodState
 
 /**
  * Aparece por cima do keyguard (showWhenLocked). Não substitui a tela de bloqueio do sistema:
@@ -46,10 +54,15 @@ class LockScreenActivity : ComponentActivity() {
 
     private val unlockSignal = mutableStateOf(false)
     private val notifAccess = mutableStateOf(true)
+    private val aod = mutableStateOf(false)
+    private val handler = Handler(Looper.getMainLooper())
+    // fim da janela do AOD: só solta a tela; o timeout do sistema apaga (o conteúdo continua preto)
+    private val endAod = Runnable { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setShowWhenLocked(true)
+        applyAod(intent?.getBooleanExtra(EXTRA_AOD, false) == true)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
@@ -73,7 +86,13 @@ class LockScreenActivity : ComponentActivity() {
             LockTheme(seed = wallpaper?.let { it.palette.seed }, dark = isSystemInDarkTheme()) {
                 val notifs by LockNotificationRepository.items.collectAsStateWithLifecycle()
                 val torch by TorchController.isOn.collectAsStateWithLifecycle()
-                LockScreenContent(
+                Crossfade(targetState = aod.value, animationSpec = tween(280), label = "aod") { isAod ->
+                if (isAod) AodContent(
+                    settings = settings,
+                    notifications = notifs,
+                    palette = wallpaper?.palette ?: LockPalette.Default,
+                    onWake = { AodState.screenIsAod = false; applyAod(false) },
+                ) else LockScreenContent(
                     settings = settings,
                     wallpaper = wallpaper,
                     notifications = notifs,
@@ -92,8 +111,36 @@ class LockScreenActivity : ComponentActivity() {
                     onClearAll = { LockNotificationListener.cancelAll() },
                     onRequestUnlock = { cb -> unlock(onFail = { cb(false) }) },
                 )
+                }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        applyAod(intent.getBooleanExtra(EXTRA_AOD, false))
+    }
+
+    /** AOD em LCD: tela acesa em brilho mínimo por AOD_WINDOW_MS; depois libera e o timeout do sistema apaga. */
+    private fun applyAod(on: Boolean) {
+        handler.removeCallbacks(endAod)
+        aod.value = on
+        if (on) {
+            setTurnScreenOn(true)
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            window.attributes = window.attributes.apply { screenBrightness = 0.01f }
+            handler.postDelayed(endAod, AOD_WINDOW_MS)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            window.attributes = window.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
+            setTurnScreenOn(false)
+        }
+    }
+
+    companion object {
+        const val EXTRA_AOD = "pxe_aod"
+        private const val AOD_WINDOW_MS = 20_000L
     }
 
     override fun onResume() {
@@ -154,6 +201,7 @@ class LockScreenActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        handler.removeCallbacks(endAod)
         runCatching { unregisterReceiver(userPresent) }
         TorchController.unregister(this)
         super.onDestroy()

@@ -556,7 +556,7 @@ private fun GlanceInfo(w: WeatherUi, tint: Color, modifier: Modifier = Modifier)
 
 /** Texto da bateria (como a linha central do Pixel): carregando / carregada / porcentagem. */
 @Composable
-private fun rememberBatteryText(): String? {
+internal fun rememberBatteryText(): String? {
     val ctx = LocalContext.current
     var text by remember { mutableStateOf<String?>(null) }
     DisposableEffect(ctx) {
