@@ -42,6 +42,7 @@ internal data class StatusBarState(
     val ringerMode: Int = AudioManager.RINGER_MODE_NORMAL,
     val dnd: Boolean = false,
     val bluetooth: Boolean = false,
+    val bluetoothConnected: Boolean = false,
     val signalLevel: Int = 0,
     val wifi: Boolean = false,
     val wifiLevel: Int = 0,
@@ -233,15 +234,12 @@ internal class StatusBarMonitor(context: Context) {
         val granted = ContextCompat.checkSelfPermission(
             ctx, Manifest.permission.BLUETOOTH_CONNECT
         ) == PackageManager.PERMISSION_GRANTED
-        val visible = when {
-            !enabled || adapter == null -> false
-            !granted -> true
-            else -> runCatching {
-                listOf(BluetoothProfile.HEADSET, BluetoothProfile.A2DP, BluetoothProfile.GATT)
-                    .any { adapter.getProfileConnectionState(it) == BluetoothProfile.STATE_CONNECTED }
-            }.getOrDefault(false)
-        }
-        update { it.copy(bluetooth = visible) }
+        val connected = enabled && adapter != null && granted && runCatching {
+            listOf(BluetoothProfile.HEADSET, BluetoothProfile.A2DP, BluetoothProfile.GATT)
+                .any { adapter.getProfileConnectionState(it) == BluetoothProfile.STATE_CONNECTED }
+        }.getOrDefault(false)
+        val visible = if (granted) connected else enabled
+        update { it.copy(bluetooth = visible, bluetoothConnected = connected) }
     }
 
     private fun loadPrefs() {
