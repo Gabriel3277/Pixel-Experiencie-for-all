@@ -16,6 +16,13 @@ internal object Pd {
     val NotifOuter = 28.dp
     val NotifInner = 8.dp
 
+    // Controles de brilho (slider e botão automático têm a mesma altura)
+    val ControlHeight = 56.dp
+    val SliderGap = 8.dp
+    val SliderInnerRadius = 6.dp
+    val ControlIcon = 24.dp
+    val TileIcon = 26.dp
+
     val Time = TextStyle(fontSize = 44.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp)
     val Title = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.2).sp)
     val Label = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold)

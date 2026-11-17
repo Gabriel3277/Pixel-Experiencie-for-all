@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -48,8 +50,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -59,6 +65,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -81,7 +92,7 @@ internal fun HeaderButton(
         modifier = Modifier
             .size(40.dp)
             .clip(CircleShape)
-            .clickable(onClick = onClick),
+            .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -141,8 +152,8 @@ private fun ToggleBox(
     val radius by animateDpAsState(
         targetValue = if (pressed) 12.dp else if (active) activeRadius else inactiveRadius,
         animationSpec = spring(
-            dampingRatio = 0.5f,
-            stiffness = Spring.StiffnessLow,
+            dampingRatio = 0.6f,
+            stiffness = Spring.StiffnessMediumLow,
         ),
         label = "radius",
     )
@@ -186,6 +197,7 @@ private fun ToggleBox(
             interactionSource = interaction,
             indication = null,
             enabled = enabled,
+            role = Role.Button,
             onClick = {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
@@ -211,10 +223,10 @@ internal fun CircleButton(
     onClick: () -> Unit,
 ) {
     ToggleBox(
-        modifier = Modifier.size(56.dp),
+        modifier = Modifier.size(Pd.ControlHeight),
         active = active,
         colors = colors,
-        inactiveRadius = 28.dp,
+        inactiveRadius = Pd.ControlHeight / 2,
         activeRadius = activeRadius,
         onClick = onClick,
     ) { fg, pop ->
@@ -223,7 +235,7 @@ internal fun CircleButton(
             contentDescription = label,
             tint = fg,
             modifier = Modifier
-                .size(24.dp)
+                .size(Pd.ControlIcon)
                 .then(pop),
         )
     }
@@ -281,8 +293,8 @@ internal fun PillSlider(
 
     // Trecho em que o centro da alça pode andar: sobra uma pílula mínima
     // (22 dp) + o espaço (8 dp) de cada lado.
-    val minPillPx = with(density) { 56.dp.toPx() }
-    val gapPx = with(density) { 8.dp.toPx() }
+    val minPillPx = with(density) { Pd.ControlHeight.toPx() }
+    val gapPx = with(density) { Pd.SliderGap.toPx() }
 
     fun fractionAt(x: Float): Float {
         val start = minPillPx + gapPx
@@ -292,8 +304,17 @@ internal fun PillSlider(
 
     Box(
         modifier = modifier
-            .height(56.dp)
+            .height(Pd.ControlHeight)
             .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f) }
+            .semantics(mergeDescendants = true) {
+                if (enabled) {
+                    progressBarRangeInfo = ProgressBarRangeInfo(value.coerceIn(0f, 1f), 0f..1f)
+                    setProgress { v ->
+                        emit(v.coerceIn(0f, 1f))
+                        true
+                    }
+                }
+            }
             .pointerInput(enabled) {
                 if (enabled) {
                     detectTapGestures(
@@ -330,8 +351,9 @@ internal fun PillSlider(
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
-                val minPill = 56.dp.toPx()
-                val gap = 8.dp.toPx()
+                val minPill = Pd.ControlHeight.toPx()
+                val gap = Pd.SliderGap.toPx()
+                val inner = Pd.SliderInnerRadius.toPx()
 
                 val handleW = 4.5f.dp.toPx() - 1.2f.dp.toPx() * press
                 val handleTop = 5.dp.toPx() - 2.dp.toPx() * press
@@ -340,26 +362,10 @@ internal fun PillSlider(
                 val end = w - minPill - gap
                 val x = if (end > start) start + shown * (end - start) else w / 2f
 
-                val fillRight = x - gap
-                if (fillRight > 0f) {
-                    drawRoundRect(
-                        color = fillColor,
-                        topLeft = Offset.Zero,
-                        size = Size(fillRight, h),
-                        cornerRadius = CornerRadius(min(h / 2f, fillRight / 2f)),
-                    )
-                }
-
-                val restLeft = x + gap
-                val restWidth = w - restLeft
-                if (restWidth > 0f) {
-                    drawRoundRect(
-                        color = trackColor,
-                        topLeft = Offset(restLeft, 0f),
-                        size = Size(restWidth, h),
-                        cornerRadius = CornerRadius(min(h / 2f, restWidth / 2f)),
-                    )
-                }
+                // Preenchimento: ponta externa redonda, ponta junto da alça com canto pequeno.
+                drawSegment(fillColor, 0f, x - gap, h, leftRadius = h / 2f, rightRadius = inner)
+                // Resto da trilha: espelhado.
+                drawSegment(trackColor, x + gap, w - (x + gap), h, leftRadius = inner, rightRadius = h / 2f)
 
                 drawRoundRect(
                     color = handleColor,
@@ -390,7 +396,7 @@ internal fun PillSlider(
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .padding(end = 18.dp)
+                        .padding(end = 16.dp)
                         .graphicsLayer { alpha = press },
                 )
             }
@@ -413,6 +419,33 @@ internal fun PillSlider(
             }
         }
     }
+}
+
+/** Segmento do slider com raios diferentes à esquerda e à direita (limitados ao que cabe). */
+private fun DrawScope.drawSegment(
+    color: Color,
+    left: Float,
+    width: Float,
+    height: Float,
+    leftRadius: Float,
+    rightRadius: Float,
+) {
+    if (width <= 0f) return
+    val limit = min(height, width) / 2f
+    val l = CornerRadius(min(leftRadius, limit))
+    val r = CornerRadius(min(rightRadius, limit))
+    val path = Path().apply {
+        addRoundRect(
+            RoundRect(
+                rect = Rect(left, 0f, left + width, height),
+                topLeft = l,
+                topRight = r,
+                bottomRight = r,
+                bottomLeft = l,
+            ),
+        )
+    }
+    drawPath(path, color)
 }
 
 /**
@@ -443,30 +476,33 @@ internal fun WideTile(
 
     Row(
         modifier = modifier
-            .height(76.dp)
+            .fillMaxHeight()
             .graphicsLayer {
                 scaleX = pressScale
                 scaleY = pressScale
             }
-            .clip(RoundedCornerShape(38.dp))
+            .clip(RoundedCornerShape(50))
             .background(colors.tileOff)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
+                role = Role.Button,
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onClick()
                 },
             )
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         ToggleBox(
-            modifier = Modifier.size(52.dp),
+            modifier = Modifier
+                .fillMaxHeight()
+                .aspectRatio(1f, matchHeightConstraintsFirst = true),
             active = active,
             colors = colors,
-            inactiveRadius = 26.dp,
+            inactiveRadius = 32.dp,
             activeRadius = 16.dp,
             onClick = null,
         ) { fg, pop ->
@@ -509,7 +545,7 @@ internal fun SmallTile(
     onClick: () -> Unit,
 ) {
     ToggleBox(
-        modifier = modifier.height(64.dp),
+        modifier = modifier.fillMaxHeight(),
         active = active,
         colors = colors,
         inactiveRadius = 32.dp,
@@ -522,7 +558,7 @@ internal fun SmallTile(
             contentDescription = label,
             tint = fg.copy(alpha = if (enabled) 1f else 0.38f),
             modifier = Modifier
-                .size(26.dp)
+                .size(Pd.TileIcon)
                 .then(pop),
         )
     }
