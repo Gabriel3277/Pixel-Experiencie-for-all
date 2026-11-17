@@ -4,6 +4,9 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.compose.runtime.getValue
@@ -79,15 +82,59 @@ internal class StatusBarNotificationListener : NotificationListenerService() {
         NotificationRepository.set(result)
     }
 
+    /**
+     * Desenha o ícone, recorta no contorno real do desenho e centraliza num quadrado de 14dp.
+     * Assim todos ficam com o mesmo tamanho visual e alinhados com o relógio e os indicadores,
+     * mesmo quando o app deixa margem desigual dentro do próprio ícone.
+     */
     private fun bitmapFor(sbn: StatusBarNotification): ImageBitmap? {
         cache[sbn.key]?.let { return it }
         val icon = sbn.notification.smallIcon ?: return null
         val drawable = runCatching { icon.loadDrawable(this) }.getOrNull() ?: return null
-        val size = (resources.displayMetrics.density * 16).toInt().coerceAtLeast(16)
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        drawable.setBounds(0, 0, size, size)
-        drawable.draw(Canvas(bitmap))
-        val image = bitmap.asImageBitmap()
+        val density = resources.displayMetrics.density
+        val size = (density * 14).toInt().coerceAtLeast(14)
+        val big = size * 3
+
+        val src = Bitmap.createBitmap(big, big, Bitmap.Config.ARGB_8888)
+        drawable.setBounds(0, 0, big, big)
+        drawable.draw(Canvas(src))
+
+        val px = IntArray(big * big)
+        src.getPixels(px, 0, big, 0, 0, big, big)
+        var minX = big
+        var minY = big
+        var maxX = -1
+        var maxY = -1
+        for (y in 0 until big) {
+            for (x in 0 until big) {
+                if ((px[y * big + x] ushr 24) > 24) {
+                    if (x < minX) minX = x
+                    if (x > maxX) maxX = x
+                    if (y < minY) minY = y
+                    if (y > maxY) maxY = y
+                }
+            }
+        }
+        if (maxX < 0) {
+            src.recycle()
+            return null
+        }
+
+        val bw = maxX - minX + 1
+        val bh = maxY - minY + 1
+        val scale = size * 0.92f / maxOf(bw, bh)
+        val dw = bw * scale
+        val dh = bh * scale
+        val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        Canvas(out).drawBitmap(
+            src,
+            Rect(minX, minY, maxX + 1, maxY + 1),
+            RectF((size - dw) / 2, (size - dh) / 2, (size + dw) / 2, (size + dh) / 2),
+            Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        )
+        src.recycle()
+
+        val image = out.asImageBitmap()
         cache[sbn.key] = image
         return image
     }

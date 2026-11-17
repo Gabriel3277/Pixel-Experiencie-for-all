@@ -15,18 +15,18 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -34,8 +34,8 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -46,24 +46,42 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 private val DarkInk = Color(0xFF1B1B1F)
 private const val MAX_NOTIF_ICONS = 3
 
-/** Quicksand (assets/quicksand.ttf, peso 600); se o arquivo faltar, usa a fonte do sistema. */
-private fun loadClockFont(context: Context): FontFamily =
-    runCatching {
-        val typeface = Typeface.Builder(context.assets, "quicksand.ttf")
+/** Espessura única de traço para todos os indicadores de linha. */
+private val IconStroke = 1.8.dp
+
+/** Altura padrão dos indicadores do sistema (alinhamento vertical uniforme). */
+private val SystemIconHeight = 14.dp
+
+private val NotifIconSize = 14.dp
+
+/**
+ * Fonte do relógio e da bateria: Google Sans do sistema, se existir (Pixels e ROMs que a trazem);
+ * senão Quicksand embutida (assets/quicksand.ttf, peso 600); senão a fonte padrão.
+ */
+private fun loadClockTypeface(context: Context): Typeface {
+    val googleSans = Typeface.create("google-sans", Typeface.NORMAL)
+    if (googleSans != Typeface.DEFAULT) {
+        return Typeface.create(googleSans, 500, false)
+    }
+    return runCatching {
+        Typeface.Builder(context.assets, "quicksand.ttf")
             .setFontVariationSettings("'wght' 600")
             .build()
-        if (typeface != null) FontFamily(typeface) else FontFamily.SansSerif
-    }.getOrDefault(FontFamily.SansSerif)
+    }.getOrNull() ?: Typeface.DEFAULT
+}
 
 @Composable
 internal fun StatusBarContent(s: StatusBarState) {
@@ -73,8 +91,7 @@ internal fun StatusBarContent(s: StatusBarState) {
         label = "fg"
     )
     val context = LocalContext.current
-    val clockFont = remember { loadClockFont(context) }
-    val shadow = if (s.darkIcons) null else Shadow(Color(0x66000000), Offset(0f, 1f), 3f)
+    val clockTypeface = remember { loadClockTypeface(context) }
 
     val notifs = when (s.notifMode) {
         2 -> emptyList<NotifIcon>()
@@ -88,46 +105,37 @@ internal fun StatusBarContent(s: StatusBarState) {
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Esquerda: relógio + ícones de notificação
-        Text(
-            text = s.time,
-            color = fg,
-            style = TextStyle(
-                fontFamily = clockFont,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Normal,
-                lineHeight = 20.sp,
-                lineHeightStyle = LineHeightStyle(
-                    LineHeightStyle.Alignment.Center,
-                    LineHeightStyle.Trim.Both
-                ),
-                letterSpacing = 0.sp,
-                fontFeatureSettings = "tnum",
-                shadow = shadow
-            )
-        )
-        Row(
+        // Esquerda: relógio
+        ClockText(s.time, fg, clockTypeface, !s.darkIcons)
+
+        // Centro: ícones de notificação. Ocupa só o espaço que sobra entre o relógio e os
+        // indicadores do sistema e corta o excesso, então nunca há sobreposição.
+        Box(
             modifier = Modifier
-                .padding(start = 10.dp)
-                .animateContentSize(),
-            verticalAlignment = Alignment.CenterVertically
+                .weight(1f)
+                .padding(start = 8.dp)
+                .clipToBounds(),
+            contentAlignment = Alignment.CenterStart
         ) {
-            notifs.take(MAX_NOTIF_ICONS).forEach { icon ->
-                Image(
-                    bitmap = icon.bitmap,
-                    contentDescription = null,
-                    colorFilter = ColorFilter.tint(fg),
-                    modifier = Modifier
-                        .padding(end = 6.dp)
-                        .size(15.dp)
-                )
-            }
-            if (notifs.size > MAX_NOTIF_ICONS) {
-                Canvas(Modifier.size(4.5.dp)) { drawCircle(fg) }
+            Row(
+                modifier = Modifier.animateContentSize(),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                notifs.take(MAX_NOTIF_ICONS).forEach { icon ->
+                    Image(
+                        bitmap = icon.bitmap,
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(fg),
+                        filterQuality = FilterQuality.High,
+                        modifier = Modifier.size(NotifIconSize)
+                    )
+                }
+                if (notifs.size > MAX_NOTIF_ICONS) {
+                    Canvas(Modifier.size(4.dp)) { drawCircle(fg) }
+                }
             }
         }
-
-        Spacer(Modifier.weight(1f))
 
         // Direita: indicadores do sistema
         Row(
@@ -141,121 +149,215 @@ internal fun StatusBarContent(s: StatusBarState) {
             Slot(s.ringerMode == AudioManager.RINGER_MODE_VIBRATE && s.showVibrate) { VibrateIcon(fg) }
             Slot(true) { SignalIcon(s.signalLevel, fg) }
             Slot(s.wifi) { WifiIcon(s.wifiLevel, fg) }
-            Slot(true) { BatteryPill(s) }
+            Slot(true, 7.dp) { BatteryPill(s, clockTypeface) }
         }
+    }
+}
+
+/**
+ * Relógio desenhado direto no Canvas: o centro vertical dos dígitos é o centro da barra,
+ * igual ao dos ícones, sem depender das métricas da fonte (que deslocavam o texto para cima).
+ */
+@Composable
+private fun ClockText(text: String, color: Color, typeface: Typeface, shadow: Boolean) {
+    val density = LocalDensity.current
+    val paint = remember(typeface) {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.typeface = typeface
+            textAlign = Paint.Align.LEFT
+            fontFeatureSettings = "tnum"
+        }
+    }
+    val ref = remember { android.graphics.Rect() }
+    val widthDp = with(density) {
+        paint.textSize = 16.sp.toPx()
+        paint.measureText(text.ifEmpty { "00:00" }).toDp()
+    }
+    Canvas(Modifier.size(width = widthDp, height = 20.dp)) {
+        paint.textSize = 16.sp.toPx()
+        paint.color = color.toArgb()
+        if (shadow) {
+            paint.setShadowLayer(3f, 0f, 1f, 0x66000000)
+        } else {
+            paint.clearShadowLayer()
+        }
+        paint.getTextBounds("0", 0, 1, ref)
+        val y = size.height / 2 - ref.exactCenterY()
+        drawIntoCanvas { it.nativeCanvas.drawText(text, 0f, y, paint) }
     }
 }
 
 /** Entrada e saída discretas: some e aparece com fade e deslocamento horizontal. */
 @Composable
-private fun Slot(visible: Boolean, content: @Composable () -> Unit) {
+private fun Slot(visible: Boolean, gap: Dp = 5.dp, content: @Composable () -> Unit) {
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn(tween(180)) + expandHorizontally(tween(180)),
         exit = fadeOut(tween(140)) + shrinkHorizontally(tween(140))
     ) {
-        Box(Modifier.padding(start = 6.dp), contentAlignment = Alignment.Center) { content() }
+        Box(Modifier.padding(start = gap), contentAlignment = Alignment.Center) { content() }
     }
 }
 
-/** Sinal do Pixel: 5 barras de pontas redondas; as acesas vão da esquerda para a direita. */
+// ---------------------------------------------------------------------------
+// Geometria auxiliar (formas preenchidas com cantos arredondados, sem strokes sobrepostos)
+// ---------------------------------------------------------------------------
+
+/** Ponto a distância [d] de [from] na direção de [to] (no máximo até a metade do segmento). */
+private fun towards(from: Offset, to: Offset, d: Float): Offset {
+    val dx = to.x - from.x
+    val dy = to.y - from.y
+    val len = sqrt(dx * dx + dy * dy)
+    if (len == 0f) return from
+    val k = (d / len).coerceAtMost(0.5f)
+    return Offset(from.x + dx * k, from.y + dy * k)
+}
+
+/** Curva quadrática escrita como cúbica (compatível com qualquer versão do Compose). */
+private fun Path.quad(p0: Offset, q: Offset, p2: Offset) {
+    cubicTo(
+        p0.x + (q.x - p0.x) * 2f / 3f, p0.y + (q.y - p0.y) * 2f / 3f,
+        p2.x + (q.x - p2.x) * 2f / 3f, p2.y + (q.y - p2.y) * 2f / 3f,
+        p2.x, p2.y
+    )
+}
+
+/** Polígono com todos os cantos arredondados em raio [d]. */
+private fun roundedPolygon(pts: List<Offset>, d: Float): Path {
+    val path = Path()
+    val n = pts.size
+    for (i in 0 until n) {
+        val cur = pts[i]
+        val a = towards(cur, pts[(i + n - 1) % n], d)
+        val b = towards(cur, pts[(i + 1) % n], d)
+        if (i == 0) path.moveTo(a.x, a.y) else path.lineTo(a.x, a.y)
+        path.quad(a, cur, b)
+    }
+    path.close()
+    return path
+}
+
+/** Leque do Wi-Fi: ponta em (cx, cy), raio [r], abertura de 100°, três cantos arredondados em [d]. */
+private fun fanPath(cx: Float, cy: Float, r: Float, d: Float): Path {
+    val start = -140f
+    val sweep = 100f
+    fun pt(angle: Float, dist: Float): Offset {
+        val rad = angle * (PI / 180.0)
+        return Offset(cx + dist * cos(rad).toFloat(), cy + dist * sin(rad).toFloat())
+    }
+    val delta = (d / r) * (180f / PI.toFloat())
+    val a1 = start
+    val a2 = start + sweep
+    val tip = Offset(cx, cy)
+    val left = pt(a1, r)
+    val right = pt(a2, r)
+    val s = pt(a1, d)
+
+    val path = Path()
+    path.moveTo(s.x, s.y)
+    val l1 = pt(a1, r - d)
+    path.lineTo(l1.x, l1.y)
+    path.quad(l1, left, pt(a1 + delta, r))
+    path.arcTo(Rect(tip, r), a1 + delta, sweep - 2 * delta, false)
+    val arcEnd = pt(a2 - delta, r)
+    val r1 = pt(a2, r - d)
+    path.quad(arcEnd, right, r1)
+    val e = pt(a2, d)
+    path.lineTo(e.x, e.y)
+    path.quad(e, tip, s)
+    path.close()
+    return path
+}
+
+// ---------------------------------------------------------------------------
+// Indicadores do sistema
+// ---------------------------------------------------------------------------
+
+/** Sinal móvel do Pixel: triângulo de cantos arredondados; o nível preenche da esquerda para a direita. */
 @Composable
 private fun SignalIcon(level: Int, color: Color) {
-    val lit = (level.coerceIn(0, 4) * 5 + 3) / 4
-    val alphas = List(5) { i ->
-        animateFloatAsState(if (i < lit) 1f else 0.3f, tween(200), label = "sig$i").value
-    }
-    Canvas(Modifier.size(width = 22.2.dp, height = 14.dp)) {
-        val bw = 2.8.dp.toPx()
-        val pitch = 4.85.dp.toPx()
-        val fracs = floatArrayOf(0.40f, 0.58f, 0.75f, 0.88f, 1f)
-        for (i in 0 until 5) {
-            val h = size.height * fracs[i]
-            drawRoundRect(
-                color = color.copy(alpha = alphas[i]),
-                topLeft = Offset(i * pitch, size.height - h),
-                size = Size(bw, h),
-                cornerRadius = CornerRadius(bw / 2)
-            )
+    val frac by animateFloatAsState(level.coerceIn(0, 4) / 4f, tween(200), label = "signal")
+    Canvas(Modifier.size(width = 15.dp, height = 13.dp)) {
+        val w = size.width
+        val h = size.height
+        val tri = roundedPolygon(
+            listOf(Offset(0f, h), Offset(w, h), Offset(w, 0f)),
+            2.2.dp.toPx()
+        )
+        drawPath(tri, color.copy(alpha = 0.3f))
+        if (frac > 0f) {
+            clipRect(right = w * frac) { drawPath(tri, color) }
         }
     }
 }
 
-/** Wi-Fi do Pixel: ponto + 2 arcos grossos de pontas redondas; o sinal acende de dentro para fora. */
+/** Wi-Fi do Pixel: leque preenchido de cantos arredondados; o nível preenche do centro para fora. */
 @Composable
 private fun WifiIcon(level: Int, color: Color) {
-    val innerA by animateFloatAsState(if (level >= 2) 1f else 0.3f, tween(250), label = "wifiIn")
-    val outerA by animateFloatAsState(if (level >= 3) 1f else 0.3f, tween(250), label = "wifiOut")
-    Canvas(Modifier.size(width = 19.dp, height = 13.5.dp)) {
-        val sw = 2.6.dp.toPx()
-        val dotR = 1.7.dp.toPx()
+    val frac by animateFloatAsState(level.coerceIn(0, 4) / 4f, tween(250), label = "wifi")
+    Canvas(Modifier.size(width = 19.5.dp, height = 13.dp)) {
+        val r = 12.5.dp.toPx()
         val cx = size.width / 2
-        val cy = size.height - dotR - 0.1.dp.toPx()
-        drawCircle(color, radius = dotR, center = Offset(cx, cy))
-        val arcs = listOf(5.6.dp.toPx() to innerA, 10.2.dp.toPx() to outerA)
-        for ((r, a) in arcs) {
-            drawArc(
-                color = color.copy(alpha = a),
-                startAngle = -142.5f,
-                sweepAngle = 105f,
-                useCenter = false,
-                topLeft = Offset(cx - r, cy - r),
-                size = Size(r * 2, r * 2),
-                style = Stroke(width = sw, cap = StrokeCap.Round)
-            )
+        val cy = size.height
+        val fan = fanPath(cx, cy, r, 2.2.dp.toPx())
+        drawPath(fan, color.copy(alpha = 0.3f))
+        if (frac >= 0.999f) {
+            drawPath(fan, color)
+        } else if (frac > 0f) {
+            val lit = Path().apply { addOval(Rect(Offset(cx, cy), r * frac)) }
+            clipPath(lit) { drawPath(fan, color) }
         }
     }
 }
 
-/** Alto-falante cortado (silencioso), como no Pixel. */
+/** Alto-falante cortado (silencioso). */
 @Composable
 private fun SpeakerOffIcon(color: Color) {
-    Canvas(Modifier.size(width = 14.dp, height = 13.dp)) {
-        val w = size.width
-        val h = size.height
-        val body = Path().apply {
-            moveTo(w * 0.06f, h * 0.38f)
-            lineTo(w * 0.26f, h * 0.38f)
-            lineTo(w * 0.48f, h * 0.18f)
-            lineTo(w * 0.48f, h * 0.82f)
-            lineTo(w * 0.26f, h * 0.62f)
-            lineTo(w * 0.06f, h * 0.62f)
-            close()
-        }
+    Canvas(Modifier.size(SystemIconHeight)) {
+        val u = size.width / 14f
+        val sw = IconStroke.toPx()
+        fun p(x: Float, y: Float) = Offset(x * u, y * u)
+        val body = roundedPolygon(
+            listOf(p(1f, 5f), p(3.6f, 5f), p(7.2f, 1.8f), p(7.2f, 12.2f), p(3.6f, 9f), p(1f, 9f)),
+            0.9f * u
+        )
         drawPath(body, color)
-        drawPath(body, color, style = Stroke(width = w * 0.06f, join = StrokeJoin.Round))
         drawArc(
             color = color,
-            startAngle = -45f,
-            sweepAngle = 90f,
+            startAngle = -42f,
+            sweepAngle = 84f,
             useCenter = false,
-            topLeft = Offset(w * 0.46f - w * 0.3f, h * 0.5f - w * 0.3f),
-            size = Size(w * 0.6f, w * 0.6f),
-            style = Stroke(width = w * 0.11f, cap = StrokeCap.Round)
+            topLeft = p(2.6f, 3f),
+            size = Size(8f * u, 8f * u),
+            style = Stroke(width = sw, cap = StrokeCap.Round)
         )
-        drawLine(color, Offset(w * 0.08f, h * 0.08f), Offset(w * 0.94f, h * 0.94f), w * 0.12f, StrokeCap.Round)
+        drawLine(color, p(1.8f, 1.8f), p(12.2f, 12.2f), sw, StrokeCap.Round)
     }
 }
 
-/** Runa do Bluetooth; quando há dispositivo conectado, ganha um ponto de cada lado (como no Pixel). */
+/** Runa do Bluetooth; quando há dispositivo conectado, ganha um ponto de cada lado. */
 @Composable
 private fun BluetoothIcon(connected: Boolean, color: Color) {
-    Canvas(Modifier.size(width = 13.dp, height = 14.dp)) {
+    Canvas(Modifier.size(width = 13.dp, height = SystemIconHeight)) {
         val w = size.width
         val h = size.height
+        val sw = IconStroke.toPx()
         val rw = 7.dp.toPx()
         val ox = (w - rw) / 2
+        val top = sw / 2
+        val bottom = h - sw / 2
+        val span = bottom - top
         val rune = Path().apply {
-            moveTo(ox + rw * 0.05f, h * 0.30f)
-            lineTo(ox + rw * 0.95f, h * 0.72f)
-            lineTo(ox + rw * 0.50f, h * 0.97f)
-            lineTo(ox + rw * 0.50f, h * 0.03f)
-            lineTo(ox + rw * 0.95f, h * 0.28f)
-            lineTo(ox + rw * 0.05f, h * 0.70f)
+            moveTo(ox + rw * 0.05f, top + span * 0.30f)
+            lineTo(ox + rw * 0.95f, top + span * 0.72f)
+            lineTo(ox + rw * 0.50f, bottom)
+            lineTo(ox + rw * 0.50f, top)
+            lineTo(ox + rw * 0.95f, top + span * 0.28f)
+            lineTo(ox + rw * 0.05f, top + span * 0.70f)
         }
         drawPath(
             rune, color,
-            style = Stroke(width = 1.7.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+            style = Stroke(width = sw, cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
         if (connected) {
             val r = 1.0.dp.toPx()
@@ -265,51 +367,61 @@ private fun BluetoothIcon(connected: Boolean, color: Color) {
     }
 }
 
+/** Vibrar: aparelho com marcas de vibração nas laterais. */
 @Composable
 private fun VibrateIcon(color: Color) {
-    Canvas(Modifier.size(width = 15.dp, height = 12.dp)) {
+    Canvas(Modifier.size(width = 15.dp, height = SystemIconHeight)) {
         val w = size.width
         val h = size.height
-        val sw = h * 0.12f
+        val sw = IconStroke.toPx()
+        val pw = 5.4.dp.toPx()
         drawRoundRect(
             color = color,
-            topLeft = Offset(w * 0.3f, h * 0.06f),
-            size = Size(w * 0.4f, h * 0.88f),
-            cornerRadius = CornerRadius(w * 0.08f),
+            topLeft = Offset((w - pw) / 2, sw / 2),
+            size = Size(pw, h - sw),
+            cornerRadius = CornerRadius(1.6.dp.toPx()),
             style = Stroke(width = sw)
         )
-        drawLine(color, Offset(w * 0.12f, h * 0.3f), Offset(w * 0.12f, h * 0.7f), sw, StrokeCap.Round)
-        drawLine(color, Offset(w * 0.88f, h * 0.3f), Offset(w * 0.88f, h * 0.7f), sw, StrokeCap.Round)
+        drawLine(color, Offset(sw / 2, h * 0.30f), Offset(sw / 2, h * 0.70f), sw, StrokeCap.Round)
+        drawLine(color, Offset(w - sw / 2, h * 0.30f), Offset(w - sw / 2, h * 0.70f), sw, StrokeCap.Round)
     }
 }
 
+/** Não Perturbe: círculo com traço central. */
 @Composable
 private fun DndIcon(color: Color) {
-    Canvas(Modifier.size(13.dp)) {
+    Canvas(Modifier.size(SystemIconHeight)) {
         val w = size.width
-        val sw = 1.9.dp.toPx()
+        val sw = IconStroke.toPx()
         drawCircle(color, radius = w / 2 - sw / 2, style = Stroke(width = sw))
-        drawLine(color, Offset(w * 0.27f, w * 0.5f), Offset(w * 0.73f, w * 0.5f), sw, StrokeCap.Round)
+        drawLine(color, Offset(w * 0.28f, w * 0.5f), Offset(w * 0.72f, w * 0.5f), sw, StrokeCap.Round)
     }
 }
 
+/** VPN: chave. */
 @Composable
 private fun KeyIcon(color: Color) {
     Canvas(Modifier.size(width = 15.dp, height = 10.dp)) {
         val w = size.width
         val h = size.height
-        val sw = h * 0.22f
-        val r = h * 0.3f
+        val sw = IconStroke.toPx()
+        val r = (h - sw) / 2
         drawCircle(color, radius = r, center = Offset(r + sw / 2, h / 2), style = Stroke(width = sw))
         drawLine(color, Offset(2 * r + sw, h / 2), Offset(w - sw / 2, h / 2), sw, StrokeCap.Round)
-        drawLine(color, Offset(w * 0.68f, h / 2), Offset(w * 0.68f, h * 0.9f), sw, StrokeCap.Round)
-        drawLine(color, Offset(w - sw / 2, h / 2), Offset(w - sw / 2, h * 0.9f), sw, StrokeCap.Round)
+        drawLine(color, Offset(w * 0.68f, h / 2), Offset(w * 0.68f, h - sw / 2), sw, StrokeCap.Round)
+        drawLine(color, Offset(w - sw / 2, h / 2), Offset(w - sw / 2, h - sw / 2), sw, StrokeCap.Round)
     }
 }
 
-/** Bateria estilo Pixel: corpo arredondado, parte vazia cinza, número escuro dentro e terminal à direita. */
+// ---------------------------------------------------------------------------
+// Bateria
+// ---------------------------------------------------------------------------
+
+private class BatteryMetrics(val body: Float, val bolt: Float, val gap: Float)
+
+/** Bateria em cápsula (estilo Pixel): parte vazia cinza, número centralizado e terminal discreto. */
 @Composable
-private fun BatteryPill(s: StatusBarState) {
+private fun BatteryPill(s: StatusBarState, typeface: Typeface) {
     val dark = s.darkIcons
     val low = s.batteryPct <= 15 && !s.charging
     val accent: Color? = when {
@@ -323,28 +435,46 @@ private fun BatteryPill(s: StatusBarState) {
     val fill by animateColorAsState(accent ?: baseTarget, tween(300), label = "battFill")
     val textOnFill = if (accent == null && dark) Color.White else DarkInk
     val pct by animateFloatAsState(s.batteryPct.coerceIn(0, 100) / 100f, tween(400), label = "battPct")
-    val paint = remember {
+
+    val density = LocalDensity.current
+    val paint = remember(typeface) {
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
+            this.typeface = typeface
             textAlign = Paint.Align.CENTER
         }
     }
-    val label = s.batteryPct.toString()
+    val bounds = remember { android.graphics.Rect() }
+    val label = s.batteryPct.coerceIn(0, 100).toString()
     val showText = s.showBatteryPct
     val charging = s.charging
 
-    Canvas(Modifier.size(width = 31.dp, height = 15.dp)) {
+    // A largura segue o conteúdo; 1 e 2 dígitos usam a mesma largura para não "pular".
+    val metrics = with(density) {
+        paint.textSize = 14.sp.toPx()
+        val ref = if (showText) paint.measureText(if (label.length >= 3) "100" else "88") else 0f
+        val bolt = if (charging) 6.5.dp.toPx() else 0f
+        val gap = if (charging && showText) 1.5.dp.toPx() else 0f
+        val pad = 5.dp.toPx()
+        val minW = (if (showText) 24.dp else 20.dp).toPx()
+        BatteryMetrics(max(minW, ref + bolt + gap + 2 * pad), bolt, gap)
+    }
+    val bodyDp = with(density) { metrics.body.toDp() }
+
+    Canvas(Modifier.size(width = bodyDp + 2.8.dp, height = 16.dp)) {
         val h = size.height
+        val bodyW = metrics.body
+        val nubGap = 1.dp.toPx()
         val nubW = 1.8.dp.toPx()
-        val nubH = 5.5.dp.toPx()
-        val bodyW = size.width - nubW - 1.2.dp.toPx()
+        val nubH = 5.dp.toPx()
         val track = base.copy(alpha = 0.35f)
 
-        val body = Path().apply { addRoundRect(RoundRect(0f, 0f, bodyW, h, CornerRadius(h * 0.26f))) }
+        val body = Path().apply {
+            addRoundRect(RoundRect(0f, 0f, bodyW, h, CornerRadius(h * 0.42f)))
+        }
         drawPath(body, track)
         drawRoundRect(
             color = if (pct > 0.97f) fill else track,
-            topLeft = Offset(size.width - nubW, (h - nubH) / 2),
+            topLeft = Offset(bodyW + nubGap, (h - nubH) / 2),
             size = Size(nubW, nubH),
             cornerRadius = CornerRadius(nubW / 2)
         )
@@ -352,47 +482,51 @@ private fun BatteryPill(s: StatusBarState) {
         val fw = bodyW * pct
         clipPath(body) { drawRect(fill, size = Size(fw, h)) }
         clipRect(0f, 0f, fw, h) {
-            drawBatteryGlyphs(paint, label, showText, charging, textOnFill, bodyW)
+            drawBatteryGlyphs(paint, bounds, label, showText, charging, textOnFill, metrics)
         }
         // Na parte vazia (cinza) o número é sempre escuro, como no Pixel.
         clipRect(fw, 0f, bodyW, h) {
-            drawBatteryGlyphs(paint, label, showText, charging, DarkInk, bodyW)
+            drawBatteryGlyphs(paint, bounds, label, showText, charging, DarkInk, metrics)
         }
     }
 }
 
 private fun DrawScope.drawBatteryGlyphs(
     paint: Paint,
+    bounds: android.graphics.Rect,
     label: String,
     showText: Boolean,
     charging: Boolean,
     color: Color,
-    w: Float
+    m: BatteryMetrics
 ) {
     val h = size.height
-    val textCenter = if (charging && showText) w * 0.62f else w / 2
+    paint.textSize = 14.sp.toPx()
+    val textW = if (showText) paint.measureText(label) else 0f
+    val groupW = m.bolt + m.gap + textW
+    val start = (m.body - groupW) / 2
 
     if (charging) {
-        val bw = h * 0.42f
-        val bh = h * 0.68f
-        val ox = if (showText) w * 0.1f else (w - bw) / 2
+        val bw = m.bolt
+        val bh = h * 0.62f
         val oy = (h - bh) / 2
-        val bolt = Path().apply {
-            moveTo(ox + bw * 0.62f, oy)
-            lineTo(ox + bw * 0.05f, oy + bh * 0.56f)
-            lineTo(ox + bw * 0.45f, oy + bh * 0.56f)
-            lineTo(ox + bw * 0.36f, oy + bh)
-            lineTo(ox + bw * 0.95f, oy + bh * 0.42f)
-            lineTo(ox + bw * 0.55f, oy + bh * 0.42f)
-            close()
-        }
+        fun b(x: Float, y: Float) = Offset(start + bw * x, oy + bh * y)
+        val bolt = roundedPolygon(
+            listOf(
+                b(0.62f, 0f), b(0.05f, 0.56f), b(0.45f, 0.56f),
+                b(0.36f, 1f), b(0.95f, 0.42f), b(0.55f, 0.42f)
+            ),
+            0.6.dp.toPx()
+        )
         drawPath(bolt, color)
     }
 
     if (showText) {
-        paint.textSize = 13.sp.toPx()
         paint.color = color.toArgb()
-        val y = h / 2 - (paint.ascent() + paint.descent()) / 2
-        drawIntoCanvas { it.nativeCanvas.drawText(label, textCenter, y, paint) }
+        paint.getTextBounds(label, 0, label.length, bounds)
+        // Centraliza a altura real dos dígitos (não a caixa da fonte) no meio da cápsula.
+        val y = h / 2 - bounds.exactCenterY()
+        val cx = start + m.bolt + m.gap + textW / 2
+        drawIntoCanvas { it.nativeCanvas.drawText(label, cx, y, paint) }
     }
 }
