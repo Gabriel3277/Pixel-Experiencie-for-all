@@ -83,7 +83,7 @@ internal class StatusBarNotificationListener : NotificationListenerService() {
     }
 
     /**
-     * Desenha o ícone, recorta no contorno real do desenho e centraliza num quadrado de 14dp.
+     * Desenha o ícone, recorta no contorno real do desenho e centraliza num quadrado de 16dp.
      * Assim todos ficam com o mesmo tamanho visual e alinhados com o relógio e os indicadores,
      * mesmo quando o app deixa margem desigual dentro do próprio ícone.
      */
@@ -92,7 +92,7 @@ internal class StatusBarNotificationListener : NotificationListenerService() {
         val icon = sbn.notification.smallIcon ?: return null
         val drawable = runCatching { icon.loadDrawable(this) }.getOrNull() ?: return null
         val density = resources.displayMetrics.density
-        val size = (density * 14).toInt().coerceAtLeast(14)
+        val size = (density * 16).toInt().coerceAtLeast(16)
         val big = size * 3
 
         val src = Bitmap.createBitmap(big, big, Bitmap.Config.ARGB_8888)
