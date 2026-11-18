@@ -78,6 +78,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
@@ -90,6 +91,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.sp
 import com.pixelexperience.forall.lockscreen.notifications.LockAction
 import com.pixelexperience.forall.lockscreen.notifications.LockNotification
@@ -109,6 +111,9 @@ import kotlin.math.sign
 private val OuterCorner = 28.dp
 private val InnerCorner = 6.dp
 private val CardGap = 3.dp
+
+/** Folga lateral da area da lista: os cartoes nao sao cortados ao se mover (a lista fica mais larga que os cartoes). */
+private val SideRoom = 12.dp
 
 /** Nao nulo = estilo vidro (valor = opacidade do tint). Nulo = cartoes solidos. */
 private val LocalGlassOpacity = staticCompositionLocalOf<Float?> { null }
@@ -236,9 +241,9 @@ fun NotificationsList(
 
     CompositionLocalProvider(LocalGlassOpacity provides (if (glass) opacity else null)) {
         LazyColumn(
-            modifier = modifier.fadeEdges(),
+            modifier = modifier.widenSides(SideRoom).fadeEdges(),
             verticalArrangement = Arrangement.spacedBy(CardGap),
-            contentPadding = PaddingValues(top = 12.dp, bottom = 28.dp),
+            contentPadding = PaddingValues(start = SideRoom, end = SideRoom, top = 12.dp, bottom = 28.dp),
             userScrollEnabled = !preview,
         ) {
             itemsIndexed(entries, key = { _, e -> e.key }) { idx, e ->
@@ -278,6 +283,13 @@ fun NotificationsList(
     }
 }
 
+/** Aumenta a area (hitbox/clip) da lista nos 2 lados sem mudar a posicao nem a largura dos cartoes. */
+private fun Modifier.widenSides(room: Dp): Modifier = layout { measurable, constraints ->
+    val r = room.roundToPx()
+    val p = measurable.measure(constraints.offset(horizontal = 2 * r))
+    layout(constraints.maxWidth, p.height) { p.place(-r, 0) }
+}
+
 /** Esmaece suavemente as bordas superior e inferior da lista (sem corte abrupto). */
 private fun Modifier.fadeEdges(): Modifier = this
     .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
@@ -297,7 +309,7 @@ private fun Modifier.chainWave(chain: SwipeChain, myIndex: Int): Modifier = grap
     if (i >= 0 && i != myIndex) {
         val d = abs(myIndex - i)
         val f = (0.55f - 0.12f * d).coerceAtLeast(0f)
-        val lim = 56.dp.toPx()
+        val lim = SideRoom.toPx()
         translationX = (chain.x.value * f).coerceIn(-lim, lim)
     }
 }
