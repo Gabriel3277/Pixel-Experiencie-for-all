@@ -48,7 +48,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -98,10 +97,7 @@ import com.pixelexperience.forall.lockscreen.ui.components.GlassCard
 import com.pixelexperience.forall.lockscreen.ui.theme.LockMotion
 import com.pixelexperience.forall.lockscreen.ui.theme.lockColorScheme
 import com.pixelexperience.forall.lockscreen.ui.theme.UiFont
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Date
@@ -133,16 +129,6 @@ private class Entry(
 private class SwipeChain {
     var index by mutableIntStateOf(-1)
     val x = Animatable(0f)
-    /** Escopo da lista (nao do cartao): a mola de volta nao e cancelada quando o cartao sai da composicao. */
-    var scope: CoroutineScope? = null
-
-    fun release() {
-        val s = scope ?: return
-        s.launch {
-            x.animateTo(0f, LockMotion.bouncy())
-            index = -1
-        }
-    }
 }
 
 /** Papeis de cor Material You dos cartoes. */
@@ -214,8 +200,7 @@ fun NotificationsList(
     var showQuiet by rememberSaveable { mutableStateOf(false) }
     val quiet = remember(items) { items.filter { it.importance < NotificationManager.IMPORTANCE_DEFAULT } }
     val quietApps = remember(quiet) { quiet.distinctBy { it.packageName } }
-    val listScope = rememberCoroutineScope()
-    val chain = remember(listScope) { SwipeChain().also { it.scope = listScope } }
+    val chain = remember { SwipeChain() }
     var clearing by remember { mutableStateOf(false) }
 
     val entries = remember(items, grouped, showQuiet) {
@@ -312,7 +297,7 @@ private fun Modifier.chainWave(chain: SwipeChain, myIndex: Int): Modifier = grap
     if (i >= 0 && i != myIndex) {
         val d = abs(myIndex - i)
         val f = (0.55f - 0.12f * d).coerceAtLeast(0f)
-        val lim = 10.dp.toPx()
+        val lim = 56.dp.toPx()
         translationX = (chain.x.value * f).coerceIn(-lim, lim)
     }
 }
@@ -343,18 +328,6 @@ private fun Modifier.swipeAway(enabled: Boolean, chain: SwipeChain?, index: Int,
     val scope = rememberCoroutineScope()
     var width by remember { mutableIntStateOf(1) }
     val latest by rememberUpdatedState(onDismissed)
-
-    // se o arrasto for desativado/cancelado no meio (ex.: a notificacao mudou), o cartao volta sozinho
-    LaunchedEffect(enabled) {
-        if (!enabled) {
-            if (offset.value != 0f) offset.animateTo(0f, LockMotion.bouncy())
-            chain?.release()
-        }
-    }
-    DisposableEffect(Unit) {
-        onDispose { if (chain != null && chain.index == index) chain.release() }
-    }
-
     this
         .onSizeChanged { width = it.width.coerceAtLeast(1) }
         .graphicsLayer {
@@ -366,7 +339,7 @@ private fun Modifier.swipeAway(enabled: Boolean, chain: SwipeChain?, index: Int,
             enabled = enabled,
             state = rememberDraggableState { d ->
                 scope.launch(start = CoroutineStart.UNDISPATCHED) {
-                    offset.snapTo((offset.value + d).coerceIn(-width.toFloat(), width.toFloat()))
+                    offset.snapTo(offset.value + d)
                     if (chain != null) {
                         chain.index = index
                         chain.x.snapTo(offset.value)
@@ -377,20 +350,15 @@ private fun Modifier.swipeAway(enabled: Boolean, chain: SwipeChain?, index: Int,
                 val moved = abs(offset.value) > 8f
                 val far = abs(offset.value) > width * 0.35f
                 val fast = abs(v) > 1400f && (!moved || sign(v) == sign(offset.value))
-                chain?.release()
-                try {
-                    if (far || fast) {
-                        val dir = if (moved) sign(offset.value) else sign(v)
-                        offset.animateTo(dir * width, tween(180))
-                        latest()
-                        delay(700)
-                        offset.animateTo(0f, LockMotion.bouncy())
-                    } else {
-                        offset.animateTo(0f, LockMotion.bouncy())
-                    }
-                } finally {
-                    // mesmo se for cancelado, nunca fica preso fora do lugar
-                    withContext(NonCancellable) { if (offset.value != 0f) offset.snapTo(0f) }
+                if (chain != null) scope.launch { chain.x.animateTo(0f, LockMotion.bouncy()) }
+                if (far || fast) {
+                    val dir = if (moved) sign(offset.value) else sign(v)
+                    offset.animateTo(dir * width, tween(180))
+                    latest()
+                    delay(700)
+                    offset.animateTo(0f, LockMotion.bouncy())
+                } else {
+                    offset.animateTo(0f, LockMotion.bouncy())
                 }
             },
         )
