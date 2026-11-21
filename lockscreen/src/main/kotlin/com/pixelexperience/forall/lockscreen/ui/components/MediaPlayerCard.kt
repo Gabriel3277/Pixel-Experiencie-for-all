@@ -5,7 +5,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -14,6 +14,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -58,6 +60,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -152,10 +155,12 @@ private fun PlayerBody(
     val pos = rememberPositionMs(info)
     val frac = if (info.durationMs > 0L) (pos.toFloat() / info.durationMs).coerceIn(0f, 1f) else 0f
     val chevron by animateFloatAsState(if (expanded) 180f else 0f, LockMotion.spatial(), label = "chevron")
+    val coverCorner by animateDpAsState(if (expanded) 24.dp else 18.dp, LockMotion.spatial(), label = "coverCorner")
+    val barHeight by animateDpAsState(if (expanded) 6.dp else 3.dp, LockMotion.spatial(), label = "barHeight")
 
-    Column(Modifier.fillMaxWidth().padding(14.dp).animateContentSize(LockMotion.spatial())) {
+    Column(Modifier.fillMaxWidth().padding(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Cover(info.art, coverSize, accent, onAccent)
+            Cover(info.art, coverSize, coverCorner, info.playing, accent, onAccent)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 AnimatedContent(
@@ -179,12 +184,18 @@ private fun PlayerBody(
                         }
                     }
                 }
-                if (!expanded) {
-                    Spacer(Modifier.height(8.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        ControlButton(Icons.Rounded.SkipPrevious, "Anterior", 36.dp, 22.dp, onTint, enabled = info.canPrev) { media.prev() }
-                        PlayButton(info.playing, 44.dp, playCorner, accent, onAccent) { media.togglePlay() }
-                        ControlButton(Icons.Rounded.SkipNext, "Próxima", 36.dp, 22.dp, onTint, enabled = info.canNext) { media.next() }
+                AnimatedVisibility(
+                    visible = !expanded,
+                    enter = fadeIn(tween(180, delayMillis = 70)) + expandVertically(LockMotion.spatial()),
+                    exit = fadeOut(tween(80)) + shrinkVertically(LockMotion.spatial()),
+                ) {
+                    Column {
+                        Spacer(Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            ControlButton(Icons.Rounded.SkipPrevious, "Anterior", 36.dp, 22.dp, onTint, enabled = info.canPrev) { media.prev() }
+                            PlayButton(info.playing, 44.dp, playCorner, accent, onAccent) { media.togglePlay() }
+                            ControlButton(Icons.Rounded.SkipNext, "Próxima", 36.dp, 22.dp, onTint, enabled = info.canNext) { media.next() }
+                        }
                     }
                 }
             }
@@ -207,45 +218,76 @@ private fun PlayerBody(
             }
         }
 
-        if (expanded) {
+        // a barra é única: só muda de espessura/interatividade entre compacto e expandido
+        if (expanded || info.durationMs > 0L) {
             Spacer(Modifier.height(10.dp))
             val seek: ((Float) -> Unit)? =
-                if (info.canSeek) ({ f: Float -> media.seekTo((f * info.durationMs).toLong()) }) else null
-            ProgressBar(frac, chip, accent, 6.dp, seek)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(fmt(pos), color = sub, fontSize = 12.sp, fontFamily = UiFont)
-                Text(if (info.durationMs > 0L) fmt(info.durationMs) else "", color = sub, fontSize = 12.sp, fontFamily = UiFont)
+                if (expanded && info.canSeek) ({ f: Float -> media.seekTo((f * info.durationMs).toLong()) }) else null
+            ProgressBar(frac, chip, accent, barHeight, seek)
+        }
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn(tween(160)) + expandVertically(LockMotion.spatial()),
+            exit = fadeOut(tween(90)) + shrinkVertically(LockMotion.spatial()),
+        ) {
+            Column(Modifier.fillMaxWidth()) {
+                Reveal(40, Modifier.fillMaxWidth()) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(fmt(pos), color = sub, fontSize = 12.sp, fontFamily = UiFont)
+                        Text(if (info.durationMs > 0L) fmt(info.durationMs) else "", color = sub, fontSize = 12.sp, fontFamily = UiFont)
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
+                Reveal(90, Modifier.fillMaxWidth()) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (info.canSeek) ControlButton(Icons.Rounded.Replay10, "Voltar 10 segundos", 40.dp, 24.dp, onTint) { media.seekTo(pos - 10_000L) }
+                        ControlButton(Icons.Rounded.SkipPrevious, "Anterior", 44.dp, 28.dp, onTint, enabled = info.canPrev) { media.prev() }
+                        PlayButton(info.playing, 56.dp, playCorner, accent, onAccent) { media.togglePlay() }
+                        ControlButton(Icons.Rounded.SkipNext, "Próxima", 44.dp, 28.dp, onTint, enabled = info.canNext) { media.next() }
+                        if (info.canSeek) ControlButton(Icons.Rounded.Forward10, "Avançar 10 segundos", 40.dp, 24.dp, onTint) { media.seekTo(pos + 10_000L) }
+                    }
+                }
+                if (!info.appLabel.isNullOrBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Reveal(150, Modifier.fillMaxWidth()) {
+                        Text(
+                            info.appLabel, color = sub, fontSize = 12.sp, fontFamily = UiFont,
+                            textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                }
             }
-            Spacer(Modifier.height(6.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (info.canSeek) ControlButton(Icons.Rounded.Replay10, "Voltar 10 segundos", 40.dp, 24.dp, onTint) { media.seekTo(pos - 10_000L) }
-                ControlButton(Icons.Rounded.SkipPrevious, "Anterior", 44.dp, 28.dp, onTint, enabled = info.canPrev) { media.prev() }
-                PlayButton(info.playing, 56.dp, playCorner, accent, onAccent) { media.togglePlay() }
-                ControlButton(Icons.Rounded.SkipNext, "Próxima", 44.dp, 28.dp, onTint, enabled = info.canNext) { media.next() }
-                if (info.canSeek) ControlButton(Icons.Rounded.Forward10, "Avançar 10 segundos", 40.dp, 24.dp, onTint) { media.seekTo(pos + 10_000L) }
-            }
-            if (!info.appLabel.isNullOrBlank()) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    info.appLabel, color = sub, fontSize = 12.sp, fontFamily = UiFont,
-                    textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        } else if (info.durationMs > 0L) {
-            Spacer(Modifier.height(10.dp))
-            ProgressBar(frac, chip, accent, 3.dp, null)
         }
     }
 }
 
+/** Entrada escalonada: sobe levemente e aparece com atraso (só roda quando o bloco entra na composição). */
 @Composable
-private fun Cover(art: ImageBitmap?, size: Dp, accent: Color, onAccent: Color) {
+private fun Reveal(delayMs: Int, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    var on by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { on = true }
+    val a by animateFloatAsState(
+        if (on) 1f else 0f,
+        tween<Float>(280, delayMillis = delayMs, easing = FastOutSlowInEasing),
+        label = "reveal",
+    )
+    Box(modifier.graphicsLayer { alpha = a; translationY = (1f - a) * 14.dp.toPx() }) { content() }
+}
+
+@Composable
+private fun Cover(art: ImageBitmap?, size: Dp, corner: Dp, playing: Boolean, accent: Color, onAccent: Color) {
+    // capa "respira": levemente menor quando pausado
+    val scale by animateFloatAsState(if (playing) 1f else 0.93f, LockMotion.spatial(), label = "coverScale")
     Box(
-        Modifier.size(size).clip(RoundedCornerShape(if (size > 70.dp) 22.dp else 18.dp)).background(accent),
+        Modifier.size(size)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(RoundedCornerShape(corner))
+            .background(accent),
         contentAlignment = Alignment.Center,
     ) {
         Crossfade(targetState = art, animationSpec = LockMotion.effects(), label = "art") { a ->
@@ -294,7 +336,17 @@ private fun ControlButton(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, description, tint = if (enabled) fg else fg.copy(alpha = 0.38f), modifier = Modifier.size(iconSize))
+        val tint = if (enabled) fg else fg.copy(alpha = 0.38f)
+        AnimatedContent(
+            targetState = icon,
+            transitionSpec = {
+                (fadeIn(tween(170, delayMillis = 40)) + scaleIn(tween(220, delayMillis = 40), initialScale = 0.6f)) togetherWith
+                    (fadeOut(tween(90)) + scaleOut(tween(120), targetScale = 0.6f))
+            },
+            label = "icon",
+        ) { ic ->
+            Icon(ic, description, tint = tint, modifier = Modifier.size(iconSize))
+        }
     }
 }
 
@@ -302,22 +354,26 @@ private fun ControlButton(
 @Composable
 private fun ProgressBar(frac: Float, track: Color, fill: Color, height: Dp, onSeek: ((Float) -> Unit)?) {
     var drag by remember { mutableStateOf<Float?>(null) }
+    val interactive = onSeek != null
+    val seekNow by rememberUpdatedState(onSeek) // evita reiniciar o gesto a cada tique do progresso
     val shown by animateFloatAsState(
         drag ?: frac,
         if (drag != null) snap<Float>() else tween<Float>(900, easing = LinearEasing),
         label = "progress",
     )
+    val barH by animateDpAsState(if (drag != null) height + 4.dp else height, LockMotion.fastSpatial(), label = "barH")
+    val hit by animateDpAsState(if (interactive) 28.dp else height, LockMotion.spatial(), label = "hit")
     Box(
         Modifier.fillMaxWidth()
-            .height(if (onSeek != null) 28.dp else height)
-            .pointerInput(onSeek) {
-                if (onSeek != null) detectTapGestures { o -> onSeek((o.x / size.width).coerceIn(0f, 1f)) }
+            .height(maxOf(hit, barH))
+            .pointerInput(interactive) {
+                if (interactive) detectTapGestures { o -> seekNow?.invoke((o.x / size.width).coerceIn(0f, 1f)) }
             }
-            .pointerInput(onSeek) {
-                if (onSeek != null) {
+            .pointerInput(interactive) {
+                if (interactive) {
                     detectHorizontalDragGestures(
                         onDragStart = { o -> drag = (o.x / size.width).coerceIn(0f, 1f) },
-                        onDragEnd = { drag?.let { onSeek(it) }; drag = null },
+                        onDragEnd = { drag?.let { seekNow?.invoke(it) }; drag = null },
                         onDragCancel = { drag = null },
                         onHorizontalDrag = { c, _ ->
                             c.consume()
@@ -328,8 +384,8 @@ private fun ProgressBar(frac: Float, track: Color, fill: Color, height: Dp, onSe
             },
         contentAlignment = Alignment.CenterStart,
     ) {
-        Box(Modifier.fillMaxWidth().height(height).clip(CircleShape).background(track))
-        Box(Modifier.fillMaxWidth(shown.coerceIn(0f, 1f)).height(height).clip(CircleShape).background(fill))
+        Box(Modifier.fillMaxWidth().height(barH).clip(CircleShape).background(track))
+        Box(Modifier.fillMaxWidth(shown.coerceIn(0f, 1f)).height(barH).clip(CircleShape).background(fill))
     }
 }
 
