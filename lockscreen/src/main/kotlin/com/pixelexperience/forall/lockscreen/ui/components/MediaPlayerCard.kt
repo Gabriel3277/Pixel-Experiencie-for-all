@@ -57,28 +57,37 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -86,6 +95,7 @@ import com.pixelexperience.forall.lockscreen.media.LockMediaState
 import com.pixelexperience.forall.lockscreen.media.MediaInfo
 import com.pixelexperience.forall.lockscreen.ui.theme.LockMotion
 import com.pixelexperience.forall.lockscreen.ui.theme.UiFont
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -93,6 +103,10 @@ import kotlinx.coroutines.isActive
  * Player de mídia da lockscreen (cartão horizontal compacto, que expande ao tocar).
  * Só aparece quando há uma sessão de mídia válida; todos os controles falam com o MediaController real.
  * glass = true usa o GlassCard (vidro); false usa cartão sólido, igual ao estilo das notificações.
+ *
+ * Desempenho: UMA animação (t: 0 = compacto, 1 = expandido) lida só nas fases de layout/desenho,
+ * então expandir/recolher não recompõe nada por quadro. O tique do progresso (1 s) recompõe só a
+ * barra e o texto do tempo, não o cartão inteiro.
  */
 @Composable
 fun MediaPlayerCard(
@@ -134,6 +148,39 @@ fun MediaPlayerCard(
     }
 }
 
+private fun mix(a: Float, b: Float, t: Float): Float = a + (b - a) * t
+
+/** Altura = altura cheia × fração (lida só no layout). O conteúdo é medido uma vez e recortado. */
+private fun Modifier.heightFraction(fraction: () -> Float): Modifier = this
+    .clipToBounds()
+    .layout { measurable, constraints ->
+        val p = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+        val h = (p.height * fraction().coerceIn(0f, 1f)).roundToInt()
+        layout(p.width, h) { p.place(0, 0) }
+    }
+
+/** Aparece (fade + sobe um pouco) a partir de `from` (0..1) do progresso t. Só fase de desenho. */
+private fun Modifier.stagger(t: () -> Float, from: Float): Modifier = graphicsLayer {
+    val a = ((t() - from) / (1f - from)).coerceIn(0f, 1f)
+    alpha = a
+    translationY = (1f - a) * 12.dp.toPx()
+}
+
+/** Capa: ocupa de 64 a 88 dp no layout, mas é medida/desenhada sempre em 88 dp e só escalada na GPU. */
+private fun Modifier.coverBox(t: () -> Float): Modifier = layout { measurable, _ ->
+    val big = 88.dp.roundToPx()
+    val p = measurable.measure(Constraints.fixed(big, big))
+    val s = mix(64.dp.toPx(), 88.dp.toPx(), t().coerceIn(0f, 1f)).roundToInt()
+    layout(s, s) {
+        val sc = s.toFloat() / big
+        p.placeWithLayer(0, 0) {
+            transformOrigin = TransformOrigin(0f, 0f)
+            scaleX = sc
+            scaleY = sc
+        }
+    }
+}
+
 @Composable
 private fun PlayerBody(
     info: MediaInfo,
@@ -149,18 +196,20 @@ private fun PlayerBody(
 ) {
     val sub = subColor ?: lerp(onTint, tint, 0.35f) // texto secundário: mistura opaca, sem alpha
     val chip = chipColor ?: lerp(tint, onTint, 0.12f)
-    val coverSize by animateDpAsState(if (expanded) 88.dp else 64.dp, LockMotion.spatial(), label = "cover")
+    // t: 0 = compacto, 1 = expandido. É um State lido só em layout/desenho (sem `by`, de propósito).
+    val t = animateFloatAsState(if (expanded) 1f else 0f, tween<Float>(320, easing = FastOutSlowInEasing), label = "expand")
+    val compactVisible by remember { derivedStateOf { t.value < 0.999f } }
+    val expandedVisible by remember { derivedStateOf { t.value > 0.001f } }
     val playCorner by animateDpAsState(if (info.playing) 16.dp else 28.dp, LockMotion.fastSpatial(), label = "playShape")
     val heartTint by animateColorAsState(if (info.favorite) accent else onTint, LockMotion.effects(), label = "heart")
     val pos = rememberPositionMs(info)
-    val frac = if (info.durationMs > 0L) (pos.toFloat() / info.durationMs).coerceIn(0f, 1f) else 0f
-    val chevron by animateFloatAsState(if (expanded) 180f else 0f, LockMotion.spatial(), label = "chevron")
-    val coverCorner by animateDpAsState(if (expanded) 24.dp else 18.dp, LockMotion.spatial(), label = "coverCorner")
-    val barHeight by animateDpAsState(if (expanded) 6.dp else 3.dp, LockMotion.spatial(), label = "barHeight")
+    val fracOf: () -> Float = {
+        if (info.durationMs > 0L) (pos.value.toFloat() / info.durationMs).coerceIn(0f, 1f) else 0f
+    }
 
     Column(Modifier.fillMaxWidth().padding(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Cover(info.art, coverSize, coverCorner, info.playing, accent, onAccent)
+            Cover(info.art, info.playing, accent, onAccent, Modifier.coverBox { t.value })
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 AnimatedContent(
@@ -170,10 +219,10 @@ private fun PlayerBody(
                             (fadeOut(LockMotion.effects()) + slideOutVertically(LockMotion.spatial()) { -it / 3 })
                     },
                     label = "track",
-                ) { (t, a) ->
+                ) { (ti, a) ->
                     Column {
                         Text(
-                            t, color = onTint, fontSize = 16.sp, fontFamily = UiFont,
+                            ti, color = onTint, fontSize = 16.sp, fontFamily = UiFont,
                             maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                         if (a.isNotBlank()) {
@@ -184,12 +233,12 @@ private fun PlayerBody(
                         }
                     }
                 }
-                AnimatedVisibility(
-                    visible = !expanded,
-                    enter = fadeIn(tween(180, delayMillis = 70)) + expandVertically(LockMotion.spatial()),
-                    exit = fadeOut(tween(80)) + shrinkVertically(LockMotion.spatial()),
-                ) {
-                    Column {
+                if (!expanded || compactVisible) {
+                    Column(
+                        Modifier
+                            .heightFraction { 1f - t.value }
+                            .graphicsLayer { alpha = (1f - t.value * 2f).coerceIn(0f, 1f) },
+                    ) {
                         Spacer(Modifier.height(8.dp))
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             ControlButton(Icons.Rounded.SkipPrevious, "Anterior", 36.dp, 22.dp, onTint, enabled = info.canPrev) { media.prev() }
@@ -203,7 +252,7 @@ private fun PlayerBody(
                 Spacer(Modifier.width(6.dp))
                 ControlButton(
                     if (info.favorite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
-                    if (info.favorite) "Remover dos favoritos" else "Favoritar", 40.dp, 22.dp, heartTint, bg = chip,
+                    if (info.favorite) "Remover dos favoritos" else "Favoritar", 40.dp, 22.dp, heartTint, bg = chip, morph = true,
                 ) { media.toggleFavorite() }
             }
             Spacer(Modifier.width(6.dp))
@@ -213,80 +262,68 @@ private fun PlayerBody(
             ) {
                 Icon(
                     Icons.Filled.KeyboardArrowDown, if (expanded) "Recolher" else "Expandir", tint = onTint,
-                    modifier = Modifier.size(22.dp).rotate(chevron),
+                    modifier = Modifier.size(22.dp).graphicsLayer { rotationZ = 180f * t.value },
                 )
             }
         }
 
-        // a barra é única: só muda de espessura/interatividade entre compacto e expandido
+        // a barra é única: só muda de espessura/área de toque entre compacto e expandido
         if (expanded || info.durationMs > 0L) {
             Spacer(Modifier.height(10.dp))
             val seek: ((Float) -> Unit)? =
                 if (expanded && info.canSeek) ({ f: Float -> media.seekTo((f * info.durationMs).toLong()) }) else null
-            ProgressBar(frac, chip, accent, barHeight, seek)
+            ProgressBar(fracOf, chip, accent, { t.value }, info.canSeek, seek)
         }
 
-        AnimatedVisibility(
-            visible = expanded,
-            enter = fadeIn(tween(160)) + expandVertically(LockMotion.spatial()),
-            exit = fadeOut(tween(90)) + shrinkVertically(LockMotion.spatial()),
-        ) {
-            Column(Modifier.fillMaxWidth()) {
-                Reveal(40, Modifier.fillMaxWidth()) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(fmt(pos), color = sub, fontSize = 12.sp, fontFamily = UiFont)
-                        Text(if (info.durationMs > 0L) fmt(info.durationMs) else "", color = sub, fontSize = 12.sp, fontFamily = UiFont)
-                    }
+        if (expanded || expandedVisible) {
+            Column(Modifier.fillMaxWidth().heightFraction { t.value }) {
+                Row(
+                    Modifier.fillMaxWidth().stagger({ t.value }, 0.15f),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    TimeText(pos, sub)
+                    Text(if (info.durationMs > 0L) fmt(info.durationMs) else "", color = sub, fontSize = 12.sp, fontFamily = UiFont)
                 }
                 Spacer(Modifier.height(6.dp))
-                Reveal(90, Modifier.fillMaxWidth()) {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (info.canSeek) ControlButton(Icons.Rounded.Replay10, "Voltar 10 segundos", 40.dp, 24.dp, onTint) { media.seekTo(pos - 10_000L) }
-                        ControlButton(Icons.Rounded.SkipPrevious, "Anterior", 44.dp, 28.dp, onTint, enabled = info.canPrev) { media.prev() }
-                        PlayButton(info.playing, 56.dp, playCorner, accent, onAccent) { media.togglePlay() }
-                        ControlButton(Icons.Rounded.SkipNext, "Próxima", 44.dp, 28.dp, onTint, enabled = info.canNext) { media.next() }
-                        if (info.canSeek) ControlButton(Icons.Rounded.Forward10, "Avançar 10 segundos", 40.dp, 24.dp, onTint) { media.seekTo(pos + 10_000L) }
-                    }
+                Row(
+                    Modifier.fillMaxWidth().stagger({ t.value }, 0.3f),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (info.canSeek) ControlButton(Icons.Rounded.Replay10, "Voltar 10 segundos", 40.dp, 24.dp, onTint) { media.seekTo(pos.value - 10_000L) }
+                    ControlButton(Icons.Rounded.SkipPrevious, "Anterior", 44.dp, 28.dp, onTint, enabled = info.canPrev) { media.prev() }
+                    PlayButton(info.playing, 56.dp, playCorner, accent, onAccent) { media.togglePlay() }
+                    ControlButton(Icons.Rounded.SkipNext, "Próxima", 44.dp, 28.dp, onTint, enabled = info.canNext) { media.next() }
+                    if (info.canSeek) ControlButton(Icons.Rounded.Forward10, "Avançar 10 segundos", 40.dp, 24.dp, onTint) { media.seekTo(pos.value + 10_000L) }
                 }
                 if (!info.appLabel.isNullOrBlank()) {
                     Spacer(Modifier.height(8.dp))
-                    Reveal(150, Modifier.fillMaxWidth()) {
-                        Text(
-                            info.appLabel, color = sub, fontSize = 12.sp, fontFamily = UiFont,
-                            textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
+                    Text(
+                        info.appLabel, color = sub, fontSize = 12.sp, fontFamily = UiFont,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().stagger({ t.value }, 0.5f),
+                    )
                 }
             }
         }
     }
 }
 
-/** Entrada escalonada: sobe levemente e aparece com atraso (só roda quando o bloco entra na composição). */
+/** Texto do tempo atual: só ele recompõe a cada segundo. */
 @Composable
-private fun Reveal(delayMs: Int, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    var on by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { on = true }
-    val a by animateFloatAsState(
-        if (on) 1f else 0f,
-        tween<Float>(280, delayMillis = delayMs, easing = FastOutSlowInEasing),
-        label = "reveal",
-    )
-    Box(modifier.graphicsLayer { alpha = a; translationY = (1f - a) * 14.dp.toPx() }) { content() }
+private fun TimeText(pos: State<Long>, color: Color) {
+    Text(fmt(pos.value), color = color, fontSize = 12.sp, fontFamily = UiFont)
 }
 
 @Composable
-private fun Cover(art: ImageBitmap?, size: Dp, corner: Dp, playing: Boolean, accent: Color, onAccent: Color) {
-    // capa "respira": levemente menor quando pausado
-    val scale by animateFloatAsState(if (playing) 1f else 0.93f, LockMotion.spatial(), label = "coverScale")
+private fun Cover(art: ImageBitmap?, playing: Boolean, accent: Color, onAccent: Color, modifier: Modifier = Modifier) {
+    // capa "respira": levemente menor quando pausada (só desenho)
+    val ps = animateFloatAsState(if (playing) 1f else 0.93f, LockMotion.spatial(), label = "coverScale")
     Box(
-        Modifier.size(size)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(RoundedCornerShape(corner))
+        modifier
+            .size(88.dp)
+            .graphicsLayer { scaleX = ps.value; scaleY = ps.value }
+            .clip(RoundedCornerShape(24.dp))
             .background(accent),
         contentAlignment = Alignment.Center,
     ) {
@@ -294,7 +331,7 @@ private fun Cover(art: ImageBitmap?, size: Dp, corner: Dp, playing: Boolean, acc
             if (a != null) {
                 Image(bitmap = a, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             } else {
-                Icon(Icons.Rounded.MusicNote, null, tint = onAccent, modifier = Modifier.size(size * 0.45f))
+                Icon(Icons.Rounded.MusicNote, null, tint = onAccent, modifier = Modifier.size(40.dp))
             }
         }
     }
@@ -305,7 +342,7 @@ private fun Cover(art: ImageBitmap?, size: Dp, corner: Dp, playing: Boolean, acc
 private fun PlayButton(playing: Boolean, size: Dp, corner: Dp, accent: Color, onAccent: Color, onClick: () -> Unit) {
     ControlButton(
         if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-        if (playing) "Pausar" else "Tocar", size, size * 0.55f, onAccent, bg = accent, corner = corner, onClick = onClick,
+        if (playing) "Pausar" else "Tocar", size, size * 0.55f, onAccent, bg = accent, corner = corner, morph = true, onClick = onClick,
     )
 }
 
@@ -319,15 +356,16 @@ private fun ControlButton(
     bg: Color = Color.Transparent,
     corner: Dp = size / 2,
     enabled: Boolean = true,
+    morph: Boolean = false,
     onClick: () -> Unit,
 ) {
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.86f else 1f, LockMotion.fastSpatial(), label = "press")
+    val scale = animateFloatAsState(if (pressed) 0.86f else 1f, LockMotion.fastSpatial(), label = "press")
     val haptic = LocalHapticFeedback.current
     Box(
         Modifier.size(size)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .graphicsLayer { scaleX = scale.value; scaleY = scale.value }
             .clip(RoundedCornerShape(corner))
             .background(bg)
             .clickable(interactionSource = src, indication = null, enabled = enabled, onClickLabel = description) {
@@ -337,35 +375,56 @@ private fun ControlButton(
         contentAlignment = Alignment.Center,
     ) {
         val tint = if (enabled) fg else fg.copy(alpha = 0.38f)
-        AnimatedContent(
-            targetState = icon,
-            transitionSpec = {
-                (fadeIn(tween(170, delayMillis = 40)) + scaleIn(tween(220, delayMillis = 40), initialScale = 0.6f)) togetherWith
-                    (fadeOut(tween(90)) + scaleOut(tween(120), targetScale = 0.6f))
-            },
-            label = "icon",
-        ) { ic ->
-            Icon(ic, description, tint = tint, modifier = Modifier.size(iconSize))
+        if (morph) {
+            // troca de ícone com escala+fade só onde importa (play/pause e coração)
+            AnimatedContent(
+                targetState = icon,
+                transitionSpec = {
+                    (fadeIn(tween(160, delayMillis = 40)) + scaleIn(tween(200, delayMillis = 40), initialScale = 0.6f)) togetherWith
+                        (fadeOut(tween(80)) + scaleOut(tween(100), targetScale = 0.6f))
+                },
+                label = "icon",
+            ) { ic ->
+                Icon(ic, description, tint = tint, modifier = Modifier.size(iconSize))
+            }
+        } else {
+            Icon(icon, description, tint = tint, modifier = Modifier.size(iconSize))
         }
     }
 }
 
-/** Barra de progresso; com onSeek (sessão aceita ACTION_SEEK_TO) vira interativa: toque e arraste. */
+/**
+ * Barra de progresso desenhada direto no canvas (sem recomposição nem layout por quadro).
+ * Com onSeek (sessão aceita ACTION_SEEK_TO) vira interativa: toque e arraste.
+ * t = 0 compacto (3 dp) → 1 expandido (6 dp; área de toque de 28 dp se canSeek).
+ */
 @Composable
-private fun ProgressBar(frac: Float, track: Color, fill: Color, height: Dp, onSeek: ((Float) -> Unit)?) {
+private fun ProgressBar(
+    frac: () -> Float,
+    track: Color,
+    fill: Color,
+    t: () -> Float,
+    canSeek: Boolean,
+    onSeek: ((Float) -> Unit)?,
+) {
     var drag by remember { mutableStateOf<Float?>(null) }
     val interactive = onSeek != null
     val seekNow by rememberUpdatedState(onSeek) // evita reiniciar o gesto a cada tique do progresso
-    val shown by animateFloatAsState(
-        drag ?: frac,
+    val shown = animateFloatAsState(
+        drag ?: frac(),
         if (drag != null) snap<Float>() else tween<Float>(900, easing = LinearEasing),
         label = "progress",
     )
-    val barH by animateDpAsState(if (drag != null) height + 4.dp else height, LockMotion.fastSpatial(), label = "barH")
-    val hit by animateDpAsState(if (interactive) 28.dp else height, LockMotion.spatial(), label = "hit")
+    val dragT = animateFloatAsState(if (drag != null) 1f else 0f, tween<Float>(120), label = "dragGrow")
     Box(
         Modifier.fillMaxWidth()
-            .height(maxOf(hit, barH))
+            .layout { measurable, constraints ->
+                val rest = 3.dp.toPx()
+                val full = (if (canSeek) 28.dp else 6.dp).toPx()
+                val h = mix(rest, full, t().coerceIn(0f, 1f)).roundToInt()
+                val p = measurable.measure(constraints.copy(minHeight = h, maxHeight = h))
+                layout(p.width, p.height) { p.place(0, 0) }
+            }
             .pointerInput(interactive) {
                 if (interactive) detectTapGestures { o -> seekNow?.invoke((o.x / size.width).coerceIn(0f, 1f)) }
             }
@@ -381,31 +440,42 @@ private fun ProgressBar(frac: Float, track: Color, fill: Color, height: Dp, onSe
                         },
                     )
                 }
+            }
+            .drawBehind {
+                val bh = mix(3.dp.toPx(), 6.dp.toPx(), t().coerceIn(0f, 1f)) + dragT.value * 4.dp.toPx()
+                val y = (size.height - bh) / 2f
+                val r = CornerRadius(bh / 2f, bh / 2f)
+                drawRoundRect(track, Offset(0f, y), Size(size.width, bh), r)
+                val w = size.width * shown.value.coerceIn(0f, 1f)
+                if (w > 0f) drawRoundRect(fill, Offset(0f, y), Size(w, bh), r)
             },
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Box(Modifier.fillMaxWidth().height(barH).clip(CircleShape).background(track))
-        Box(Modifier.fillMaxWidth(shown.coerceIn(0f, 1f)).height(barH).clip(CircleShape).background(fill))
-    }
+    )
 }
 
-/** Posição atual estimada (posição + tempo decorrido × velocidade). Só "tica" enquanto toca. */
+/** Posição atual estimada (posição + tempo decorrido × velocidade). Só "tica" enquanto toca. Retorna State: quem lê decide o que recompor. */
 @Composable
-private fun rememberPositionMs(info: MediaInfo): Long {
-    var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+private fun rememberPositionMs(info: MediaInfo): State<Long> {
+    val now = remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
     LaunchedEffect(info.playing, info.updateTime, info.positionMs) {
-        now = SystemClock.elapsedRealtime()
+        now.longValue = SystemClock.elapsedRealtime()
         while (info.playing && isActive) {
             delay(1000L)
-            now = SystemClock.elapsedRealtime()
+            now.longValue = SystemClock.elapsedRealtime()
         }
     }
-    val p = if (info.playing && info.updateTime > 0L) {
-        info.positionMs + ((now - info.updateTime) * info.speed).toLong()
-    } else {
-        info.positionMs
+    val cur = rememberUpdatedState(info)
+    return remember {
+        derivedStateOf {
+            val i = cur.value
+            val n = now.longValue
+            val p = if (i.playing && i.updateTime > 0L) {
+                i.positionMs + ((n - i.updateTime) * i.speed).toLong()
+            } else {
+                i.positionMs
+            }
+            if (i.durationMs > 0L) p.coerceIn(0L, i.durationMs) else p.coerceAtLeast(0L)
+        }
     }
-    return if (info.durationMs > 0L) p.coerceIn(0L, info.durationMs) else p.coerceAtLeast(0L)
 }
 
 private fun fmt(ms: Long): String {
